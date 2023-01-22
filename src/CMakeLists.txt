@@ -3,5 +3,6 @@ add_definitions(-D${sokol_backend})
 
 fips_begin_app(mo5 windowed)
     fips_files(main.c)
-    fips_deps(sokol )
+    sokol_shader(sokol_shaders.glsl ${slang})
+    fips_deps(sokol)
 fips_end_app()
