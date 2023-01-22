@@ -1,0 +1,9 @@
+#
+# mo5
+#
+---
+policies:
+  no_auto_import: true
+imports:
+  sokol:
+    git: https://github.com/scemino/sokol
