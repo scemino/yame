@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
+#include "sokol_audio.h"
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_color.h"
@@ -1209,12 +1210,13 @@ static struct
     } cartridge;
     struct
     {
-        uint8_t buffer[1024];
-        int index;
+        float buffer[1024];
+        int sample;
     } audio;
     struct
     {
         uint8_t keys[58];    // key states
+        uint8_t key_buffer;
         int joy_position;    // joysticks position
         int joy_action;      // joystick buttons state
         int xpen, ypen;      // lightpen coordinates
@@ -1245,6 +1247,7 @@ void pal_init(void)
         0xF06300FF,
     };
     for(size_t i=0; i<sizeof(pal)/sizeof(uint32_t); i++) {
+        // TODO: why do I need to do this ?
         // RGBA => ABGR
         app.gfx.palette[i] = ((pal[i]&0xFF)<<24) | ((pal[i]&0xFF00)<<8) | ((pal[i]&0xFF0000)>>8) | ((pal[i]&0xFF000000)>>24);
     }
@@ -1303,6 +1306,7 @@ static void hard_reset(void)
 
 static void init(void)
 {
+    saudio_setup(&(saudio_desc){.sample_rate = 22050});
     sg_setup(&(sg_desc){
         .context = sapp_sgcontext()});
 
@@ -1645,7 +1649,7 @@ uint8_t Mgetc(uint16_t address)
         case 0xa7c0:
             return app.mem.port[0] | 0x80 | (app.input.penbutton << 5);
         case 0xa7c1:
-            return app.mem.port[1] | 0x80 | app.input.keys[(app.mem.port[1] & 0xfe)>> 1];
+            return app.mem.port[1] | app.input.keys[(app.mem.port[1] & 0xfe)>> 1];
         case 0xa7c2:
             return app.mem.port[2];
         case 0xa7c3:
@@ -1708,15 +1712,17 @@ static void mo5_step_n(int clock)
         {
             // 1 frame is 20000 cycles
             // CPU_FREQUENCY / AUDIO_SAMPLE_RATE => 1000000/22050 = 45 cycles at 1MHz => 1 sample at 22050
-            app.audio.buffer[app.audio.index] = app.mem.sound;
-            app.audio.index = (app.audio.index + 1) % (int)sizeof(app.audio.buffer);
+            const int n_samples = sizeof(app.audio.buffer)/sizeof(float);
+            app.audio.buffer[app.audio.sample] = (float)app.mem.sound/255.f;
+            app.audio.sample = (app.audio.sample + 1) % n_samples;
             // when buffer is full, send audio buffer to sound card
-            if (app.audio.index == 0)
+            if (app.audio.sample == 0)
             {
-                // TODO: buffer_sound(app.audio.buffer);
+                saudio_push(app.audio.buffer, n_samples);
             }
-            app.clocks = app.clocks % 45;
+            app.clocks -= 45;
         }
+
         app.display.line_cycle += result;
         // wait for end of line
         if (app.display.line_cycle < 64)
@@ -1762,10 +1768,147 @@ static void apply_viewport(float canvas_width, float canvas_height)
     sg_apply_viewport(vp_x, vp_y, vp_w, vp_h, true);
 }
 
+static void _mo5_key_code(int code, bool down) {
+    const uint8_t val = down ? 0 : 0x80;
+    app.input.keys[code] = val;
+}
+
+static void _mo5_key(char c, bool down) {
+    switch(c) {
+        case 'a':
+            _mo5_key_code(0x5A>>1, down);
+            break;
+        case 'b':
+            _mo5_key_code(0x44>>1, down);
+            break;
+        case 'c':
+            _mo5_key_code(0x64>>1, down);
+            break;
+        case 'd':
+            _mo5_key_code(0x36>>1, down);
+            break;
+        case 'e':
+            _mo5_key_code(0x3A>>1, down);
+            break;
+        case 'f':
+            _mo5_key_code(0x26>>1, down);
+            break;
+        case 'g':
+            _mo5_key_code(0x16>>1, down);
+            break;
+        case 'h':
+            _mo5_key_code(0x06>>1, down);
+            break;
+        case 'i':
+            _mo5_key_code(0x18>>1, down);
+            break;
+        case 'j':
+            _mo5_key_code(0x04>>1, down);
+            break;
+        case 'k':
+            _mo5_key_code(0x14>>1, down);
+            break;
+        case 'l':
+            _mo5_key_code(0x24>>1, down);
+            break;
+        case 'm':
+            _mo5_key_code(0x34>>1, down);
+            break;
+        case 'n':
+            _mo5_key_code(0x00>>1, down);
+            break;
+        case 'o':
+            _mo5_key_code(0x28>>1, down);
+            break;
+        case 'p':
+            _mo5_key_code(0x38>>1, down);
+            break;
+        case 'q':
+            _mo5_key_code(0x56>>1, down);
+            break;
+        case 'r':
+            _mo5_key_code(0x2A>>1, down);
+            break;
+        case 's':
+            _mo5_key_code(0x46>>1, down);
+            break;
+        case 't':
+            _mo5_key_code(0x1A>>1, down);
+            break;
+        case 'u':
+            _mo5_key_code(0x08>>1, down);
+            break;
+        case 'v':
+            _mo5_key_code(0x54>>1, down);
+            break;
+        case 'w':
+            _mo5_key_code(0x60>>1, down);
+            break;
+        case 'x':
+            _mo5_key_code(0x50>>1, down);
+            break;
+        case 'y':
+            _mo5_key_code(0x0A>>1, down);
+            break;
+        case 'z':
+            _mo5_key_code(0x4A>>1, down);
+            break;
+        case '1':
+            _mo5_key_code(0x5E>>1, down);
+            break;
+        case '2':
+            _mo5_key_code(0X4E>>1, down);
+            break;
+        case '3':
+            _mo5_key_code(0x3E>>1, down);
+            break;
+        case '4':
+            _mo5_key_code(0x2E>>1, down);
+            break;
+        case '5':
+            _mo5_key_code(0x1E>>1, down);
+            break;
+        case '6':
+            _mo5_key_code(0x0E>>1, down);
+            break;
+        case '7':
+            _mo5_key_code(0x0C>>1, down);
+            break;
+        case '8':
+            _mo5_key_code(0x1C>>1, down);
+            break;
+        case '9':
+            _mo5_key_code(0x2C>>1, down);
+            break;
+        case '0':
+            _mo5_key_code(0x3C>>1, down);
+            break;
+    }
+}
+
+static void mo5_key_down(char c) {
+    _mo5_key(c, true);
+}
+
+static void mo5_key_up(char c) {
+    _mo5_key(c, false);
+}
+
+static void mo5_key_press(char c) {
+    mo5_key_down(c);
+    app.input.key_buffer = 0x80 | c;
+}
+
 static void frame(void)
 {
     mo5_step();
     screen_draw();
+
+    if(app.input.key_buffer & 0x80) {
+        char c = (char)(app.input.key_buffer & ~0x80);
+        mo5_key_up(c);
+        app.input.key_buffer = 0;
+    }
 
     // update pixel and palette textures
     sg_update_image(app.gfx.pix_img, &(sg_image_data){
@@ -1807,8 +1950,46 @@ static void frame(void)
     sg_commit();
 }
 
+static void input(const sapp_event* event) {
+    switch (event->type) {
+            case SAPP_EVENTTYPE_CHAR:
+                {
+                    int c = (int) event->char_code;
+                    if ((c > 0x20) && (c < 0x7F)) {
+                        mo5_key_press(c);
+                    }
+                }
+                break;
+            case SAPP_EVENTTYPE_KEY_DOWN:
+            case SAPP_EVENTTYPE_KEY_UP:
+                {
+                    int c = 0;
+                    switch (event->key_code) {
+                        case SAPP_KEYCODE_SPACE:        c = 0x40; break;
+                        case SAPP_KEYCODE_LEFT:         c = 0x52; break;
+                        case SAPP_KEYCODE_RIGHT:        c = 0x32; break;
+                        case SAPP_KEYCODE_DOWN:         c = 0x42; break;
+                        case SAPP_KEYCODE_UP:           c = 0x62; break;
+                        case SAPP_KEYCODE_ENTER:        c = 0x68; break;
+                        case SAPP_KEYCODE_LEFT_SHIFT:   c = 0x70; break;
+                        case SAPP_KEYCODE_BACKSPACE:    c = 0x6C; break;
+                        case SAPP_KEYCODE_COMMA:        c = 0x10; break;
+                        case SAPP_KEYCODE_INSERT:       c = 0x12; break;
+                        default:                        c = 0; break;
+                    }
+                    if (c) {
+                        _mo5_key_code(c>>1, event->type == SAPP_EVENTTYPE_KEY_DOWN);
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+}
+
 static void cleanup(void)
 {
+    saudio_shutdown();
     sg_shutdown();
 }
 
@@ -1820,6 +2001,7 @@ sapp_desc sokol_main(int argc, char *argv[])
     return (sapp_desc){
         .init_cb = init,
         .frame_cb = frame,
+        .event_cb = input,
         .cleanup_cb = cleanup,
         .width = 800,
         .height = 600,
