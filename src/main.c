@@ -6,6 +6,7 @@
 #include "sokol_color.h"
 #include "sokol_glue.h"
 #include "sokol_shaders.glsl.h"
+#define CHIPS_IMPL
 #include "mo5.h"
 
 static struct {
@@ -148,141 +149,8 @@ static void apply_viewport(float canvas_width, float canvas_height) {
   sg_apply_viewport(vp_x, vp_y, vp_w, vp_h, true);
 }
 
-static void _mo5_key_code(int code, bool down) {
-  const uint8_t val = down ? 0 : 0x80;
-  app.mo5.input.keys[code] = val;
-}
-
-static void _mo5_key(char c, bool down) {
-  switch (c) {
-  case 'a':
-    _mo5_key_code(0x5A >> 1, down);
-    break;
-  case 'b':
-    _mo5_key_code(0x44 >> 1, down);
-    break;
-  case 'c':
-    _mo5_key_code(0x64 >> 1, down);
-    break;
-  case 'd':
-    _mo5_key_code(0x36 >> 1, down);
-    break;
-  case 'e':
-    _mo5_key_code(0x3A >> 1, down);
-    break;
-  case 'f':
-    _mo5_key_code(0x26 >> 1, down);
-    break;
-  case 'g':
-    _mo5_key_code(0x16 >> 1, down);
-    break;
-  case 'h':
-    _mo5_key_code(0x06 >> 1, down);
-    break;
-  case 'i':
-    _mo5_key_code(0x18 >> 1, down);
-    break;
-  case 'j':
-    _mo5_key_code(0x04 >> 1, down);
-    break;
-  case 'k':
-    _mo5_key_code(0x14 >> 1, down);
-    break;
-  case 'l':
-    _mo5_key_code(0x24 >> 1, down);
-    break;
-  case 'm':
-    _mo5_key_code(0x34 >> 1, down);
-    break;
-  case 'n':
-    _mo5_key_code(0x00 >> 1, down);
-    break;
-  case 'o':
-    _mo5_key_code(0x28 >> 1, down);
-    break;
-  case 'p':
-    _mo5_key_code(0x38 >> 1, down);
-    break;
-  case 'q':
-    _mo5_key_code(0x56 >> 1, down);
-    break;
-  case 'r':
-    _mo5_key_code(0x2A >> 1, down);
-    break;
-  case 's':
-    _mo5_key_code(0x46 >> 1, down);
-    break;
-  case 't':
-    _mo5_key_code(0x1A >> 1, down);
-    break;
-  case 'u':
-    _mo5_key_code(0x08 >> 1, down);
-    break;
-  case 'v':
-    _mo5_key_code(0x54 >> 1, down);
-    break;
-  case 'w':
-    _mo5_key_code(0x60 >> 1, down);
-    break;
-  case 'x':
-    _mo5_key_code(0x50 >> 1, down);
-    break;
-  case 'y':
-    _mo5_key_code(0x0A >> 1, down);
-    break;
-  case 'z':
-    _mo5_key_code(0x4A >> 1, down);
-    break;
-  case '1':
-    _mo5_key_code(0x5E >> 1, down);
-    break;
-  case '2':
-    _mo5_key_code(0X4E >> 1, down);
-    break;
-  case '3':
-    _mo5_key_code(0x3E >> 1, down);
-    break;
-  case '4':
-    _mo5_key_code(0x2E >> 1, down);
-    break;
-  case '5':
-    _mo5_key_code(0x1E >> 1, down);
-    break;
-  case '6':
-    _mo5_key_code(0x0E >> 1, down);
-    break;
-  case '7':
-    _mo5_key_code(0x0C >> 1, down);
-    break;
-  case '8':
-    _mo5_key_code(0x1C >> 1, down);
-    break;
-  case '9':
-    _mo5_key_code(0x2C >> 1, down);
-    break;
-  case '0':
-    _mo5_key_code(0x3C >> 1, down);
-    break;
-  }
-}
-
-static void mo5_key_down(char c) { _mo5_key(c, true); }
-
-static void mo5_key_up(char c) { _mo5_key(c, false); }
-
-static void mo5_key_press(char c) {
-  mo5_key_down(c);
-  app.mo5.input.key_buffer = 0x80 | c;
-}
-
 static void frame(void) {
   mo5_step(&app.mo5);
-
-  if (app.mo5.input.key_buffer & 0x80) {
-    char c = (char)(app.mo5.input.key_buffer & ~0x80);
-    mo5_key_up(c);
-    app.mo5.input.key_buffer = 0;
-  }
 
   // update pixel textures
   sg_update_image(app.gfx.pix_img,
@@ -320,53 +188,68 @@ static void frame(void) {
 }
 
 static void input(const sapp_event *event) {
+  const bool shift = event->modifiers & SAPP_MODIFIER_SHIFT;
   switch (event->type) {
   case SAPP_EVENTTYPE_CHAR: {
     int c = (int)event->char_code;
     if ((c > 0x20) && (c < 0x7F)) {
-      mo5_key_press(c);
+      mo5_key_down(&app.mo5, c);
+      mo5_key_up(&app.mo5, c);
     }
   } break;
   case SAPP_EVENTTYPE_KEY_DOWN:
   case SAPP_EVENTTYPE_KEY_UP: {
     int c = 0;
+    int shift_c = 0;
     switch (event->key_code) {
     case SAPP_KEYCODE_SPACE:
-      c = 0x40;
+      c = 0x20;
       break;
     case SAPP_KEYCODE_LEFT:
-      c = 0x52;
+      c = 0x08;
       break;
     case SAPP_KEYCODE_RIGHT:
-      c = 0x32;
+      c = 0x09;
       break;
     case SAPP_KEYCODE_DOWN:
-      c = 0x42;
+      c = 0x0A;
       break;
     case SAPP_KEYCODE_UP:
-      c = 0x62;
+      c = 0x0B;
       break;
     case SAPP_KEYCODE_ENTER:
-      c = 0x68;
+      c = 0x0D;
       break;
     case SAPP_KEYCODE_LEFT_SHIFT:
-      c = 0x70;
-      break;
-    case SAPP_KEYCODE_BACKSPACE:
-      c = 0x6C;
-      break;
-    case SAPP_KEYCODE_COMMA:
-      c = 0x10;
+      c = 0x02;
       break;
     case SAPP_KEYCODE_INSERT:
-      c = 0x12;
+      c = 0x0E;
       break;
+    case SAPP_KEYCODE_BACKSPACE:
+      c = 0x01;
+      shift_c = 0x0C;
+      break; // 0x0C: clear screen
+    case SAPP_KEYCODE_ESCAPE:
+      c = 0x03;
+      shift_c = 0x13;
+      break; // 0x13: break
     default:
       c = 0;
       break;
     }
     if (c) {
-      _mo5_key_code(c >> 1, event->type == SAPP_EVENTTYPE_KEY_DOWN);
+      if (event->type == SAPP_EVENTTYPE_KEY_DOWN) {
+        if (shift_c == 0) {
+          shift_c = c;
+        }
+        mo5_key_down(&app.mo5, shift ? shift_c : c);
+      } else {
+        mo5_key_up(&app.mo5, c);
+        if (shift_c) {
+            mo5_key_up(&app.mo5, shift_c);
+        }
+      }
     }
   } break;
   default:

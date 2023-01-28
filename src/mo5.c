@@ -3,6 +3,8 @@
 #include "mo5.h"
 #include "mo5rom.h"
 
+#define _MO5_FREQUENCY (4000000)
+
 static uint32_t _mo5_palette[] = {
     0x000000FF, 0xF00000FF, 0x00F000FF, 0xF0F000FF, 0x0000F0FF, 0xF000F0FF,
     0x00F0F0FF, 0xF0F0F0FF, 0x636363FF, 0xF06363FF, 0x63F063FF, 0xF0F063FF,
@@ -29,7 +31,6 @@ static void MO5rombank(mo5_t *mo5) {
 static void prog_init(mo5_t *mo5) {
   int16_t Mgetw(uint16_t a);
 
-  memset(mo5->input.keys, 0x80, 58); // keys released
   mo5->input.joy_position = 0xff;    // center joysticks
   mo5->input.joy_action = 0xc0;      // buttons released
   mo5->cartridge.flags &= 0xec;
@@ -253,17 +254,92 @@ static void mo5_step_n(mo5_t *mo5, int clock) {
   mo5->clock_excess = c - clock;
 }
 
+// keyboard matrix initialization
+static void _mo5_init_keymap(mo5_t *sys) {
+  /*
+      http://pulkomandy.tk/wiki/doku.php?id=documentations:hardware:mo5
+  */
+
+  //    0     1     2   3   4   5   6   7
+  // 0	N	  EFF 	J	H	U	Y	7	6
+  // 1	,	  INS 	K	G	I	T	8	5
+  // 2	.	  BACK 	L	F	O	R	9	4
+  // 3	@	  RIGHT	M	D	P	E	0	3
+  // 4		  DOWN 	B	S	/	Z	-	2
+  // 5	X	  LEFT 	V	Q	*	A	+	1
+  // 6	W	  UP	C	RAZ	ENT	CNT	ACC	STOP
+  // 7	SHIFT BASIC
+
+  kbd_init(&sys->kbd, 1);
+  const char *keymap =
+      // no shift
+      "n jhuy76"
+      ", kgit85"
+      ". lfor94"
+      "@ mdpe03"
+      "  bs/z-2"
+      "x vq*a+1"
+      "w c     "
+      "        "
+
+      // shift
+      "      '&"
+      "<     (%"
+      ">     )$"
+      "^     `#"
+      "    ? =\""
+      "    : ;!"
+      "        "
+      "        ";
+  // shift key is on column 0, line 7
+  kbd_register_modifier(&sys->kbd, 0, 0, 7);
+  // ctrl key is on column 5, line 6
+  kbd_register_modifier(&sys->kbd, 1, 5, 6);
+
+  for (int shift = 0; shift < 2; shift++) {
+    for (int col = 0; col < 8; col++) {
+      for (int line = 0; line < 8; line++) {
+        int c = keymap[shift * 64 + line * 8 + col];
+        if (c != 0x20) {
+          kbd_register_key(&sys->kbd, c, col, line, shift ? (1 << 0) : 0);
+        }
+      }
+    }
+  }
+
+  // special keys
+ kbd_register_key(&sys->kbd, 0x20, 0, 4, 0); // space
+ kbd_register_key(&sys->kbd, 0x01, 1, 0, 0); // delete
+ kbd_register_key(&sys->kbd, 0x08, 1, 5, 0); // cursor left
+ kbd_register_key(&sys->kbd, 0x09, 1, 3, 0); // cursor right
+ kbd_register_key(&sys->kbd, 0x0A, 1, 4, 0); // cursor down
+ kbd_register_key(&sys->kbd, 0x0B, 1, 6, 0); // cursor up
+ kbd_register_key(&sys->kbd, 0x0C, 3, 6, 0); // clr
+ kbd_register_key(&sys->kbd, 0x0D, 4, 6, 0); // return
+ kbd_register_key(&sys->kbd, 0x0E, 4, 6, 0); // insert
+}
+
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
   m6809_init(&mo5->cpu);
   mo5->cpu.mgetc = desc->mgetc;
   mo5->cpu.mputc = desc->mputc;
   mo5->audio.callback = desc->audio_callback;
   mo5_reset(mo5);
+  _mo5_init_keymap(mo5);
 }
 
 void mo5_step(mo5_t *mo5) {
+  const uint32_t micro_seconds = 0.02 * 10e6;
   mo5_step_n(mo5, 20000);
+  kbd_update(&mo5->kbd, micro_seconds);
   screen_draw(mo5);
+}
+
+uint8_t _mo5_test_key(mo5_t *mo5, uint8_t key) {
+    uint8_t line = (key >> 4) & 0x0F;
+    uint8_t col = (key & 0x0F) >> 1;
+    uint8_t res = mo5->kbd.scanout_column_masks[line];
+    return (res & (1 << col))? 0 : 0x80;
 }
 
 int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
@@ -276,8 +352,7 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
     case 0xa7c0:
       return mo5->mem.port[0] | 0x80 | (mo5->input.penbutton << 5);
     case 0xa7c1:
-      return (int8_t)(mo5->mem.port[1] |
-                      mo5->input.keys[(mo5->mem.port[1] & 0xfe) >> 1]);
+      return (int8_t)(mo5->mem.port[1] | _mo5_test_key(mo5, mo5->mem.port[1] & 0xfe));
     case 0xa7c2:
       return (int8_t)mo5->mem.port[2];
     case 0xa7c3:
@@ -387,4 +462,12 @@ mo5_display_info_t mo5_display_info(mo5_t *mo5) {
       .palette.ptr = _mo5_palette,
   };
   return res;
+}
+
+void mo5_key_down(mo5_t *sys, int key_code) {
+  kbd_key_down(&sys->kbd, key_code);
+}
+
+void mo5_key_up(mo5_t *sys, int key_code) {
+  kbd_key_up(&sys->kbd, key_code);
 }
