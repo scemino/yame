@@ -18,7 +18,7 @@ out vec4 frag_color;
 
 void main() {
     float pix = texture(pix_img, uv).x;
-    frag_color = vec4(texture(pal_img, vec2(pix,0)).xyz, 1.0);
+    frag_color = texture(pal_img, vec2(pix,0)).rgba;
 }
 @end
 
@@ -40,8 +40,11 @@ uniform sampler2D rgba_img;
 in vec2 uv;
 out vec4 frag_color;
 
+// TODO: why do I need to do this ?
+// RGBA => ABGR
+
 void main() {
-    frag_color = texture(rgba_img, uv);
+    frag_color = texture(rgba_img, uv).abgr;
 }
 @end
 
