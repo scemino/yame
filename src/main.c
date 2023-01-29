@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include "sokol_audio.h"
+#define SOKOL_ARGS_IMPL
+#include "sokol_args.h"
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_color.h"
@@ -8,6 +10,7 @@
 #include "sokol_shaders.glsl.h"
 #define CHIPS_IMPL
 #include "mo5.h"
+#include "fs.h"
 
 static struct {
   struct {
@@ -42,6 +45,7 @@ static void init(void) {
                          .mputc = mem_write,
                          .audio_callback = {.func = audio_push}};
   mo5_init(&app.mo5, &mo5_desc);
+  fs_init();
 
   saudio_setup(&(saudio_desc){.sample_rate = 22050});
   sg_setup(&(sg_desc){.context = sapp_sgcontext()});
@@ -126,6 +130,20 @@ static void init(void) {
   app.gfx.offscreen_pass = sg_make_pass(&(sg_pass_desc){
       .color_attachments[0].image = app.gfx.rgba_img,
   });
+
+  if (sargs_exists("file")) {
+    fs_start_load_file(FS_SLOT_IMAGE, sargs_value("file"));
+  }
+}
+
+static void handle_file_loading(void) {
+  fs_dowork();
+  if (fs_success(FS_SLOT_IMAGE)) {
+    if (fs_ext(FS_SLOT_IMAGE, "k7")) {
+      mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
+    }
+    fs_reset(FS_SLOT_IMAGE);
+  }
 }
 
 // helper function to adjust aspect ratio
@@ -185,6 +203,8 @@ static void frame(void) {
   sg_draw(0, 3, 1);
   sg_end_pass();
   sg_commit();
+
+  handle_file_loading();
 }
 
 static void input(const sapp_event *event) {
@@ -247,7 +267,7 @@ static void input(const sapp_event *event) {
       } else {
         mo5_key_up(&app.mo5, c);
         if (shift_c) {
-            mo5_key_up(&app.mo5, shift_c);
+          mo5_key_up(&app.mo5, shift_c);
         }
       }
     }
@@ -263,8 +283,11 @@ static void cleanup(void) {
 }
 
 sapp_desc sokol_main(int argc, char *argv[]) {
-  (void)argc;
-  (void)argv;
+  sargs_setup(&(sargs_desc){
+      .argc = argc,
+      .argv = argv,
+      .buf_size = 512 * 1024,
+  });
 
   return (sapp_desc){
       .init_cb = init,

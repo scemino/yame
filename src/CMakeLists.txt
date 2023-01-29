@@ -2,7 +2,7 @@
 add_definitions(-D${sokol_backend})
 
 fips_begin_app(mo5 windowed)
-    fips_files(main.c m6809.c m6809.h mo5rom.h mo5.h mo5.c kbd.h)
+    fips_files(main.c m6809.c m6809.h mo5rom.h mo5.h mo5.c kbd.h data.h fs.c fs.h)
     sokol_shader(sokol_shaders.glsl ${slang})
     fips_deps(sokol)
 fips_end_app()

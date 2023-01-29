@@ -148,6 +148,35 @@ static void diskerror(mo5_t *mo5, int n) {
   mo5->cpu.cc |= 0x01;           // indicateur d'erreur
 }
 
+static void _read_tape_byte(mo5_t* sys) {
+  sys->tape.pos++;
+
+  sys->cpu.a = sys->tape.buf[sys->tape.pos];
+  sys->cpu.mputc(0x2045, 0);
+  sys->tape.bit = 0;
+}
+
+static void _read_tape_bit(mo5_t* sys) {
+  // need to read 1 byte ?
+  if (sys->tape.bit == 0) {
+    sys->tape.bit = 0x80;
+    sys->tape.pos++;
+  }
+
+  // need to read 1 byte ?
+  uint8_t byte = sys->cpu.mgetc(0x2045) << 1;
+  if ((sys->tape.buf[sys->tape.pos] & sys->tape.bit) == 0) {
+    sys->cpu.a = 0;
+  } else {
+    byte |= 0x01;
+    sys->cpu.a = 0xFF;
+  }
+  // positionne l'octet dans la page 0 du moniteur
+  sys->cpu.mputc(0x2045, byte & 0xFF);
+
+  sys->tape.bit = sys->tape.bit >> 1;
+}
+
 static void mo5_step_special_opcode(mo5_t *mo5, int io) {
   // thanks to D.Coulom for the next instructions
   // used by his emulator dcmoto
@@ -163,11 +192,11 @@ static void mo5_step_special_opcode(mo5_t *mo5, int io) {
     diskerror(mo5, 53);
     break; // formatage qd-fd
   case 0x41:
-    diskerror(mo5, 53);
-    break; // lit bit cassette
+    _read_tape_bit(mo5);
+    break;
   case 0x42:
-    diskerror(mo5, 53);
-    break; // lit octet cassette
+    _read_tape_byte(mo5);
+    break;
   case 0x45:
     diskerror(mo5, 53);
     break; // ecrit octet cassette
@@ -470,4 +499,11 @@ void mo5_key_down(mo5_t *sys, int key_code) {
 
 void mo5_key_up(mo5_t *sys, int key_code) {
   kbd_key_up(&sys->kbd, key_code);
+}
+
+bool mo5_insert_tape(mo5_t* sys, data_t data) {
+    sys->tape.bit = 0;
+    sys->tape.pos = -1;
+    memcpy(sys->tape.buf, data.ptr, data.size);
+    return true;
 }

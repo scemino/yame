@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include "m6809.h"
 #include "kbd.h"
+#include "data.h"
 
 #define SCREEN_WIDTH (336)  // screen width = 320 + 2 borders of 8 pixels
 #define SCREEN_HEIGHT (216) // screen height = 200 + 2 boarders of 8 pixels
+/* max size of a cassette tape image */
+#define MO5_MAX_TAPE_SIZE (512*1024)
 
 typedef struct {
   void (*func)(const float *samples, int num_samples, void *user_data);
@@ -30,6 +33,11 @@ typedef struct {
     uint8_t border_color; // screen border color
     uint8_t screen[SCREEN_WIDTH * SCREEN_HEIGHT];
   } display;
+  struct {
+    int bit;
+    int pos;
+    uint8_t buf[MO5_MAX_TAPE_SIZE];
+  } tape;
   struct {
     int type;  // cartridge type (0=simple 1=switch bank, 2=os-9)
     int flags; // bits0,1,4=bank, 2=cart-enabled, 3=write-enabled
@@ -59,12 +67,7 @@ typedef struct {
 } mo5_desc_t;
 
 typedef struct {
-  void *ptr;
-  size_t size;
-} palette_t;
-
-typedef struct {
-  palette_t palette;
+  data_t palette;
 } mo5_display_info_t;
 
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc);
@@ -74,5 +77,7 @@ void mo5_mem_write(mo5_t *mo5, uint16_t address, uint8_t value);
 mo5_display_info_t mo5_display_info(mo5_t *mo5);
 void mo5_key_down(mo5_t *sys, int key_code);
 void mo5_key_up(mo5_t *sys, int key_code);
+// insert tape as .k7 file
+bool mo5_insert_tape(mo5_t* sys, data_t data);
 
 #endif
