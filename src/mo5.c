@@ -89,15 +89,15 @@ static void screen_draw(mo5_t *mo5) {
     size_t x = 0;
 
     for (int xx = 0; xx < 40; xx++) {
-      const u_int8_t col = video_color(mo5, i);
-      u_int8_t c1 = col & 0x0F;
-      u_int8_t c2 = col >> 4;
+      const uint8_t col = video_color(mo5, i);
+      uint8_t c1 = col & 0x0F;
+      uint8_t c2 = col >> 4;
       assert(c1 >= 0);
       assert(c1 < 16);
 
       // TODO: oh I need to clean this ugly code
 
-      const u_int8_t pt = video_shape(mo5, i);
+      const uint8_t pt = video_shape(mo5, i);
       if ((0x80 & pt) != 0)
         pixels[x + offset] = c2;
       else

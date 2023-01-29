@@ -1,7 +1,8 @@
 #ifndef _MC6809_H_
 #define _MC6809_H_
 
-#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 // CONDITION CODE REGISTER (cpu->cc=EFHINZVC)
 #define MC6809E_CF (1<<0)           // carry
