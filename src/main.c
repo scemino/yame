@@ -11,6 +11,8 @@
 #define CHIPS_IMPL
 #include "mo5.h"
 #include "fs.h"
+#include "keybuf.h"
+#include "clock.h"
 
 static struct {
   struct {
@@ -22,8 +24,8 @@ static struct {
     sg_pipeline display_pip;
     sg_pass offscreen_pass;
   } gfx;
+  uint32_t frame_time_us;
   mo5_t mo5;
-
 } app = {0};
 
 static int8_t mem_read(uint16_t address) {
@@ -45,6 +47,8 @@ static void init(void) {
                          .mputc = mem_write,
                          .audio_callback = {.func = audio_push}};
   mo5_init(&app.mo5, &mo5_desc);
+  keybuf_init(&(keybuf_desc_t) { .key_delay_frames=7 });
+  clock_init();
   fs_init();
 
   saudio_setup(&(saudio_desc){.sample_rate = 22050});
@@ -131,19 +135,41 @@ static void init(void) {
       .color_attachments[0].image = app.gfx.rgba_img,
   });
 
+  bool delay_input = false;
   if (sargs_exists("file")) {
+    delay_input = true;
     fs_start_load_file(FS_SLOT_IMAGE, sargs_value("file"));
+  }
+  if (!delay_input) {
+    if (sargs_exists("input")) {
+      keybuf_put(sargs_value("input"));
+    }
   }
 }
 
 static void handle_file_loading(void) {
   fs_dowork();
-  if (fs_success(FS_SLOT_IMAGE)) {
+  const uint32_t load_delay_frames = 60;
+  if (fs_success(FS_SLOT_IMAGE) && ((clock_frame_count_60hz() > load_delay_frames))) {
+    bool load_success = false;
     if (fs_ext(FS_SLOT_IMAGE, "k7")) {
-      mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
+      load_success = mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
+    }
+    if (load_success) {
+        if (sargs_exists("input")) {
+            keybuf_put(sargs_value("input"));
+        }
     }
     fs_reset(FS_SLOT_IMAGE);
   }
+}
+
+static void send_keybuf_input(void) {
+    uint8_t key_code;
+    if (0 != (key_code = keybuf_get(app.frame_time_us))) {
+        mo5_key_down(&app.mo5, key_code);
+        mo5_key_up(&app.mo5, key_code);
+    }
 }
 
 // helper function to adjust aspect ratio
@@ -168,6 +194,7 @@ static void apply_viewport(float canvas_width, float canvas_height) {
 }
 
 static void frame(void) {
+  app.frame_time_us = clock_frame_time();
   mo5_step(&app.mo5);
 
   // update pixel textures
@@ -205,6 +232,7 @@ static void frame(void) {
   sg_commit();
 
   handle_file_loading();
+  send_keybuf_input();
 }
 
 static void input(const sapp_event *event) {
