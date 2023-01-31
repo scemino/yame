@@ -39,6 +39,10 @@ typedef struct {
     uint8_t buf[MO5_MAX_TAPE_SIZE];
   } tape;
   struct {
+    size_t size;
+    uint8_t buf[MO5_MAX_TAPE_SIZE];
+  } disk;
+  struct {
     int type;  // cartridge type (0=simple 1=switch bank, 2=os-9)
     int flags; // bits0,1,4=bank, 2=cart-enabled, 3=write-enabled
   } cartridge;
@@ -79,5 +83,6 @@ void mo5_key_down(mo5_t *sys, int key_code);
 void mo5_key_up(mo5_t *sys, int key_code);
 // insert tape as .k7 file
 bool mo5_insert_tape(mo5_t* sys, data_t data);
+bool mo5_insert_disk(mo5_t* sys, data_t data);
 
 #endif

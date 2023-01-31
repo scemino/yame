@@ -154,6 +154,8 @@ static void handle_file_loading(void) {
     bool load_success = false;
     if (fs_ext(FS_SLOT_IMAGE, "k7")) {
       load_success = mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
+    } else if (fs_ext(FS_SLOT_IMAGE, "fd")) {
+      load_success = mo5_insert_disk(&app.mo5, fs_data(FS_SLOT_IMAGE));
     }
     if (load_success) {
         if (sargs_exists("input")) {
@@ -238,6 +240,9 @@ static void frame(void) {
 static void input(const sapp_event *event) {
   const bool shift = event->modifiers & SAPP_MODIFIER_SHIFT;
   switch (event->type) {
+  case SAPP_EVENTTYPE_FILES_DROPPED: {
+    fs_start_load_dropped_file(FS_SLOT_IMAGE);
+    } break;
   case SAPP_EVENTTYPE_CHAR: {
     int c = (int)event->char_code;
     if ((c > 0x20) && (c < 0x7F)) {
@@ -318,6 +323,8 @@ sapp_desc sokol_main(int argc, char *argv[]) {
   });
 
   return (sapp_desc){
+      .enable_dragndrop = true,
+      .max_dropped_files = 1,
       .init_cb = init,
       .frame_cb = frame,
       .event_cb = input,

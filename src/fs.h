@@ -19,6 +19,7 @@ void fs_init(void);
 void fs_dowork(void);
 void fs_reset(size_t slot_index);
 void fs_start_load_file(size_t slot_index, const char* path);
+void fs_start_load_dropped_file(size_t slot_index);
 
 bool fs_success(size_t slot_index);
 bool fs_failed(size_t slot_index);

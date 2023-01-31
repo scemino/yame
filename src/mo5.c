@@ -150,7 +150,6 @@ static void diskerror(mo5_t *mo5, int n) {
 
 static void _read_tape_byte(mo5_t* sys) {
   sys->tape.pos++;
-
   sys->cpu.a = sys->tape.buf[sys->tape.pos];
   sys->cpu.mputc(0x2045, 0);
   sys->tape.bit = 0;
@@ -177,14 +176,54 @@ static void _read_tape_bit(mo5_t* sys) {
   sys->tape.bit = sys->tape.bit >> 1;
 }
 
+static void _read_sector(mo5_t *mo5) {
+  //if(controller == 0) Warning(M_DSK_NOTSELECTED);
+  //erreur 71=lecteur non prêt
+  if (!mo5->disk.size) {
+    diskerror(mo5, 71);
+    return;
+  }
+  int u = mo5_mem_read(mo5, 0x2049);
+  if (u > 03) {
+    diskerror(mo5, 53);
+    return;
+  }
+  int p = mo5_mem_read(mo5, 0x204a);
+  if (p != 0) {
+    diskerror(mo5, 53);
+    return;
+  }
+  p = mo5_mem_read(mo5, 0x204b);
+  if (p > 79) {
+    diskerror(mo5, 53);
+    return;
+  }
+  int s = mo5_mem_read(mo5, 0x204c);
+  if ((s == 0) || (s > 16)) {
+    diskerror(mo5, 53);
+    return;
+  }
+  s += 16 * p + 1280 * u;
+  if ((s << 8) > mo5->disk.size) {
+    diskerror(mo5, 53);
+    return;
+  }
+  uint16_t address = (mo5_mem_read(mo5, 0x204f) << 8) | (mo5_mem_read(mo5, 0x2050) & 0xff);
+  int pos = (s - 1) << 8;
+  for (int i=0; i<256; i++) {
+    mo5_mem_write(mo5, address++, mo5->disk.buf[pos++]);
+  }
+}
+
 static void mo5_step_special_opcode(mo5_t *mo5, int io) {
   // thanks to D.Coulom for the next instructions
   // used by his emulator dcmoto
   // TODO:
   switch (io) {
   case 0x14:
-    diskerror(mo5, 53);
-    break; // lit secteur qd-fd
+    // read qd-fd sector
+    _read_sector(mo5);
+    break;
   case 0x15:
     diskerror(mo5, 53);
     break; // ecrit secteur qd-fd
@@ -504,6 +543,15 @@ void mo5_key_up(mo5_t *sys, int key_code) {
 bool mo5_insert_tape(mo5_t* sys, data_t data) {
     sys->tape.bit = 0;
     sys->tape.pos = -1;
-    memcpy(sys->tape.buf, data.ptr, data.size);
+    size_t size = (data.size<MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
+    memcpy(sys->tape.buf, data.ptr, size);
+    return true;
+}
+
+
+bool mo5_insert_disk(mo5_t* sys, data_t data) {
+    sys->disk.size = (data.size<MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
+    memcpy(sys->disk.buf, data.ptr, sys->disk.size);
+    mo5_reset(sys);
     return true;
 }

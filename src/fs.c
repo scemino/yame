@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdalign.h>
+#include "sokol_app.h"
 #include "sokol_fetch.h"
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
@@ -137,6 +138,26 @@ void fs_start_load_file(size_t slot_index, const char* path) {
         .buffer = { .ptr = slot->buf, .size = FS_MAX_SIZE },
         .user_data = { .ptr = &slot_index, .size = sizeof(slot_index) },
     });
+}
+
+void fs_start_load_dropped_file(size_t slot_index) {
+    assert(state.valid);
+    assert(slot_index < FS_NUM_SLOTS);
+    fs_reset(slot_index);
+    fs_slot_t* slot = &state.slots[slot_index];
+    const char* path = sapp_get_dropped_file_path(0);
+    fs_path_append(&slot->path, path);
+    slot->result = FS_RESULT_PENDING;
+    #if defined(__EMSCRIPTEN__)
+        sapp_html5_fetch_dropped_file(&(sapp_html5_fetch_request){
+            .dropped_file_index = 0,
+            .callback = fs_emsc_dropped_file_callback,
+            .buffer = { .ptr = slot->buf, .size = FS_MAX_SIZE },
+            .user_data = (void*)(intptr_t)slot_index,
+        });
+    #else
+        fs_start_load_file(slot_index, path);
+    #endif
 }
 
 fs_result_t fs_result(size_t slot_index) {
