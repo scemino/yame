@@ -124,6 +124,25 @@ static void fs_fetch_callback(const sfetch_response_t* response) {
     }
 }
 
+#if defined(__EMSCRIPTEN__)
+static void fs_emsc_dropped_file_callback(const sapp_html5_fetch_response* response) {
+    size_t slot_index = (size_t)(uintptr_t)response->user_data;
+    assert(slot_index < FS_NUM_SLOTS);
+    fs_slot_t* slot = &state.slots[slot_index];
+    if (response->succeeded) {
+        slot->result = FS_RESULT_SUCCESS;
+        slot->ptr = (uint8_t*)response->data.ptr;
+        slot->size = response->data.size;
+        assert(slot->size < sizeof(slot->buf));
+        // in case it's a text file, zero-terminate the data
+        slot->buf[slot->size] = 0;
+    }
+    else {
+        slot->result = FS_RESULT_FAILED;
+    }
+}
+#endif
+
 void fs_start_load_file(size_t slot_index, const char* path) {
     assert(state.valid);
     assert(slot_index < FS_NUM_SLOTS);
