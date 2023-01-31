@@ -8,8 +8,10 @@
 
 #define SCREEN_WIDTH (336)  // screen width = 320 + 2 borders of 8 pixels
 #define SCREEN_HEIGHT (216) // screen height = 200 + 2 boarders of 8 pixels
-/* max size of a cassette tape image */
+// max size of a cassette tape image
 #define MO5_MAX_TAPE_SIZE (512*1024)
+// 4x16KB
+#define MO5_MAX_CARTRIDGE_SIZE (0x10000)
 
 typedef struct {
   void (*func)(const float *samples, int num_samples, void *user_data);
@@ -18,7 +20,7 @@ typedef struct {
 
 typedef struct {
   struct {
-    uint8_t cartridge[0x10000];
+    uint8_t cartridge[MO5_MAX_CARTRIDGE_SIZE];
     uint8_t ram[0xc000]; // 48K
     uint8_t port[0x40];
     uint8_t *video;
@@ -45,6 +47,7 @@ typedef struct {
   struct {
     int type;  // cartridge type (0=simple 1=switch bank, 2=os-9)
     int flags; // bits0,1,4=bank, 2=cart-enabled, 3=write-enabled
+    size_t size;
   } cartridge;
   struct {
     float buffer[1024];
@@ -84,5 +87,6 @@ void mo5_key_up(mo5_t *sys, int key_code);
 // insert tape as .k7 file
 bool mo5_insert_tape(mo5_t* sys, data_t data);
 bool mo5_insert_disk(mo5_t* sys, data_t data);
+bool mo5_insert_cartridge(mo5_t* sys, data_t data);
 
 #endif

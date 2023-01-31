@@ -156,6 +156,8 @@ static void handle_file_loading(void) {
       load_success = mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
     } else if (fs_ext(FS_SLOT_IMAGE, "fd")) {
       load_success = mo5_insert_disk(&app.mo5, fs_data(FS_SLOT_IMAGE));
+    } else if (fs_ext(FS_SLOT_IMAGE, "rom")) {
+      load_success = mo5_insert_cartridge(&app.mo5, fs_data(FS_SLOT_IMAGE));
     }
     if (load_success) {
         if (sargs_exists("input")) {

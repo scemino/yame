@@ -555,3 +555,15 @@ bool mo5_insert_disk(mo5_t* sys, data_t data) {
     mo5_reset(sys);
     return true;
 }
+
+bool mo5_insert_cartridge(mo5_t* sys, data_t data) {
+    sys->cartridge.size = (data.size<MO5_MAX_CARTRIDGE_SIZE) ? data.size : MO5_MAX_CARTRIDGE_SIZE;
+    memcpy(sys->mem.cartridge, data.ptr, sys->cartridge.size);
+    for (int i = 0; i < 0xc000; i++)
+        sys->mem.ram[i] = -((i & 0x80) >> 7);
+    sys->cartridge.type = 0; //cartouche <= 16 Ko
+    if (sys->cartridge.size > 0x4000)
+    sys->cartridge.type = 1;   //bank switch system
+    sys->cartridge.flags = 4; //cartridge enabled, write disabled, bank 0;
+    prog_init(sys);
+}
