@@ -2,7 +2,9 @@
 # project: yame
 #
 cmake_minimum_required(VERSION 3.21)
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "")
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_STANDARD 11)
 project(yame)
 
 # include the fips main cmake file

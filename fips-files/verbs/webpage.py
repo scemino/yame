@@ -136,7 +136,7 @@ def deploy_webpage(fips_dir, proj_dir, webpage_dir) :
 def build_deploy_webpage(fips_dir, proj_dir, rebuild) :
     # if webpage dir exists, clear it first
     proj_build_dir = util.get_deploy_root_dir(fips_dir, 'yame')
-    webpage_dir = '{}/chips-webpage'.format(proj_build_dir)
+    webpage_dir = '{}/yame-webpage'.format(proj_build_dir)
     if rebuild :
         if os.path.isdir(webpage_dir) :
             shutil.rmtree(webpage_dir)
@@ -155,7 +155,7 @@ def build_deploy_webpage(fips_dir, proj_dir, rebuild) :
 #-------------------------------------------------------------------------------
 def serve_webpage(fips_dir, proj_dir) :
     proj_build_dir = util.get_deploy_root_dir(fips_dir, 'yame')
-    webpage_dir = '{}/chips-webpage'.format(proj_build_dir)
+    webpage_dir = '{}/yame-webpage'.format(proj_build_dir)
     p = util.get_host_platform()
     if p == 'osx' :
         try :
@@ -200,4 +200,4 @@ def help() :
              'fips webpage rebuild\n' +
              'fips webpage serve\n' +
              log.DEF +
-             '    build chips samples webpage')
+             '    build ysame samples webpage')
