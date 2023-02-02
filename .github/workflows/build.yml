@@ -1,0 +1,51 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+    windows:
+        runs-on: windows-latest
+        steps:
+        - uses: actions/checkout@v1
+        - name: win64-vstudio-debug
+          run:  python3 fips build win64-vstudio-debug
+        - name: win64-vstudio-release
+          run:  python3 fips build win64-vstudio-release
+        - name: yame win64-vstudio-debug
+          run:  python3 fips run yame win64-vstudio-debug
+    mac:
+        runs-on: macos-latest
+        steps:
+        - uses: actions/checkout@v1
+        - name: osx-make-debug
+          run:  python3 fips build osx-make-debug
+        - name: osx-make-release
+          run:  python3 fips build osx-make-release
+        - name: yame osx-make-debug
+          run:  python3 fips run yame osx-make-debug
+    linux:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v1
+        - name: prepare
+          run:  |
+            sudo apt-get update
+            sudo apt-get install libglu1-mesa-dev mesa-common-dev xorg-dev libasound-dev
+        - name: linux-make-debug
+          run:  python3 fips build linux-make-debug
+        - name: linux-make-release
+          run:  python3 fips build linux-make-release
+        - name: yame linux-make-debug
+          run:  python3 fips run yame linux-make-debug
+    emscripten:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v1
+        - name: install emsdk
+          run: |
+            sudo apt-get install ninja-build
+            python3 fips emsdk install latest
+        - name: wasm-ninja-debug
+          run:  python3 fips build wasm-ninja-debug
+        - name: wasm-ninja-release
+          run:  python3 fips build wasm-ninja-release
