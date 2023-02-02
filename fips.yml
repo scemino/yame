@@ -1,5 +1,5 @@
 #
-# mo5
+# yame
 #
 ---
 policies:
@@ -9,4 +9,4 @@ imports:
     git: https://github.com/scemino/sokol
   sokol-tools-bin:
     git: https://github.com/floooh/sokol-tools-bin
-  
+

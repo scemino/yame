@@ -31,8 +31,8 @@ static void MO5rombank(mo5_t *mo5) {
 static void prog_init(mo5_t *mo5) {
   int16_t Mgetw(uint16_t a);
 
-  mo5->input.joy_position = 0xff;    // center joysticks
-  mo5->input.joy_action = 0xc0;      // buttons released
+  mo5->input.joy_position = 0xff; // center joysticks
+  mo5->input.joy_action = 0xc0;   // buttons released
   mo5->cartridge.flags &= 0xec;
   mo5->mem.sound = 0;
   MO5videoram(mo5);
@@ -177,8 +177,8 @@ static void _read_tape_bit(mo5_t* sys) {
 }
 
 static void _read_sector(mo5_t *mo5) {
-  //if(controller == 0) Warning(M_DSK_NOTSELECTED);
-  //erreur 71=lecteur non prêt
+  // if(controller == 0) Warning(M_DSK_NOTSELECTED);
+  // erreur 71=lecteur non prêt
   if (!mo5->disk.size) {
     diskerror(mo5, 71);
     return;
@@ -208,9 +208,10 @@ static void _read_sector(mo5_t *mo5) {
     diskerror(mo5, 53);
     return;
   }
-  uint16_t address = (mo5_mem_read(mo5, 0x204f) << 8) | (mo5_mem_read(mo5, 0x2050) & 0xff);
+  uint16_t address =
+      (mo5_mem_read(mo5, 0x204f) << 8) | (mo5_mem_read(mo5, 0x2050) & 0xff);
   int pos = (s - 1) << 8;
-  for (int i=0; i<256; i++) {
+  for (int i = 0; i < 256; i++) {
     mo5_mem_write(mo5, address++, mo5->disk.buf[pos++]);
   }
 }
@@ -221,6 +222,7 @@ static void mo5_step_special_opcode(mo5_t *mo5, int io) {
   // TODO:
   switch (io) {
   case 0x14:
+  case 0x11F5:
     // read qd-fd sector
     _read_sector(mo5);
     break;
@@ -231,10 +233,15 @@ static void mo5_step_special_opcode(mo5_t *mo5, int io) {
     diskerror(mo5, 53);
     break; // formatage qd-fd
   case 0x41:
+  case 0x11EC:
     _read_tape_bit(mo5);
     break;
   case 0x42:
+  case 0x11F1: // lecture octet cassette (pour 6809)
+  case 0x11ED: // lecture octet cassette (pour compatibilite 6309)
     _read_tape_byte(mo5);
+    break;
+  case 0x11F3: // initialisation controleur disquette
     break;
   case 0x45:
     diskerror(mo5, 53);
@@ -376,15 +383,15 @@ static void _mo5_init_keymap(mo5_t *sys) {
   }
 
   // special keys
- kbd_register_key(&sys->kbd, 0x20, 0, 4, 0); // space
- kbd_register_key(&sys->kbd, 0x01, 1, 0, 0); // delete
- kbd_register_key(&sys->kbd, 0x08, 1, 5, 0); // cursor left
- kbd_register_key(&sys->kbd, 0x09, 1, 3, 0); // cursor right
- kbd_register_key(&sys->kbd, 0x0A, 1, 4, 0); // cursor down
- kbd_register_key(&sys->kbd, 0x0B, 1, 6, 0); // cursor up
- kbd_register_key(&sys->kbd, 0x0C, 3, 6, 0); // clr
- kbd_register_key(&sys->kbd, 0x0D, 4, 6, 0); // return
- kbd_register_key(&sys->kbd, 0x0E, 4, 6, 0); // insert
+  kbd_register_key(&sys->kbd, 0x20, 0, 4, 0); // space
+  kbd_register_key(&sys->kbd, 0x01, 1, 0, 0); // delete
+  kbd_register_key(&sys->kbd, 0x08, 1, 5, 0); // cursor left
+  kbd_register_key(&sys->kbd, 0x09, 1, 3, 0); // cursor right
+  kbd_register_key(&sys->kbd, 0x0A, 1, 4, 0); // cursor down
+  kbd_register_key(&sys->kbd, 0x0B, 1, 6, 0); // cursor up
+  kbd_register_key(&sys->kbd, 0x0C, 3, 6, 0); // clr
+  kbd_register_key(&sys->kbd, 0x0D, 4, 6, 0); // return
+  kbd_register_key(&sys->kbd, 0x0E, 4, 6, 0); // insert
 }
 
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
@@ -404,10 +411,10 @@ void mo5_step(mo5_t *mo5) {
 }
 
 uint8_t _mo5_test_key(mo5_t *mo5, uint8_t key) {
-    uint8_t line = (key >> 4) & 0x0F;
-    uint8_t col = (key & 0x0F) >> 1;
-    uint8_t res = mo5->kbd.scanout_column_masks[line];
-    return (res & (1 << col))? 0 : 0x80;
+  uint8_t line = (key >> 4) & 0x0F;
+  uint8_t col = (key & 0x0F) >> 1;
+  uint8_t res = mo5->kbd.scanout_column_masks[line];
+  return (res & (1 << col)) ? 0 : 0x80;
 }
 
 int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
@@ -420,7 +427,8 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
     case 0xa7c0:
       return mo5->mem.port[0] | 0x80 | (mo5->input.penbutton << 5);
     case 0xa7c1:
-      return (int8_t)(mo5->mem.port[1] | _mo5_test_key(mo5, mo5->mem.port[1] & 0xfe));
+      return (int8_t)(mo5->mem.port[1] |
+                      _mo5_test_key(mo5, mo5->mem.port[1] & 0xfe));
     case 0xa7c2:
       return (int8_t)mo5->mem.port[2];
     case 0xa7c3:
@@ -532,38 +540,37 @@ mo5_display_info_t mo5_display_info(mo5_t *mo5) {
   return res;
 }
 
-void mo5_key_down(mo5_t *sys, int key_code) {
+void mo5_key_down(mo5_t* sys, int key_code) {
   kbd_key_down(&sys->kbd, key_code);
 }
 
-void mo5_key_up(mo5_t *sys, int key_code) {
-  kbd_key_up(&sys->kbd, key_code);
-}
+void mo5_key_up(mo5_t* sys, int key_code) { kbd_key_up(&sys->kbd, key_code); }
 
 bool mo5_insert_tape(mo5_t* sys, data_t data) {
-    sys->tape.bit = 0;
-    sys->tape.pos = -1;
-    size_t size = (data.size<MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
-    memcpy(sys->tape.buf, data.ptr, size);
-    return true;
+  sys->tape.bit = 0;
+  sys->tape.pos = -1;
+  size_t size = (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
+  memcpy(sys->tape.buf, data.ptr, size);
+  return true;
 }
 
-
 bool mo5_insert_disk(mo5_t* sys, data_t data) {
-    sys->disk.size = (data.size<MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
-    memcpy(sys->disk.buf, data.ptr, sys->disk.size);
-    mo5_reset(sys);
-    return true;
+  sys->disk.size =
+      (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
+  memcpy(sys->disk.buf, data.ptr, sys->disk.size);
+  mo5_reset(sys);
+  return true;
 }
 
 bool mo5_insert_cartridge(mo5_t* sys, data_t data) {
-    sys->cartridge.size = (data.size<MO5_MAX_CARTRIDGE_SIZE) ? data.size : MO5_MAX_CARTRIDGE_SIZE;
-    memcpy(sys->mem.cartridge, data.ptr, sys->cartridge.size);
-    for (int i = 0; i < 0xc000; i++)
-        sys->mem.ram[i] = -((i & 0x80) >> 7);
-    sys->cartridge.type = 0; //cartouche <= 16 Ko
-    if (sys->cartridge.size > 0x4000)
-    sys->cartridge.type = 1;   //bank switch system
-    sys->cartridge.flags = 4; //cartridge enabled, write disabled, bank 0;
-    prog_init(sys);
+  sys->cartridge.size =
+      (data.size < MO5_MAX_CARTRIDGE_SIZE) ? data.size : MO5_MAX_CARTRIDGE_SIZE;
+  memcpy(sys->mem.cartridge, data.ptr, sys->cartridge.size);
+  for (int i = 0; i < 0xc000; i++)
+    sys->mem.ram[i] = -((i & 0x80) >> 7);
+  sys->cartridge.type = 0; // cartouche <= 16 Ko
+  if (sys->cartridge.size > 0x4000)
+    sys->cartridge.type = 1; // bank switch system
+  sys->cartridge.flags = 4;  // cartridge enabled, write disabled, bank 0;
+  prog_init(sys);
 }

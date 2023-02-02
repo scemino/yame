@@ -13,6 +13,8 @@
 #include "fs.h"
 #include "keybuf.h"
 #include "clock.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 static struct {
   struct {
@@ -47,7 +49,7 @@ static void init(void) {
                          .mputc = mem_write,
                          .audio_callback = {.func = audio_push}};
   mo5_init(&app.mo5, &mo5_desc);
-  keybuf_init(&(keybuf_desc_t) { .key_delay_frames=7 });
+  keybuf_init(&(keybuf_desc_t){.key_delay_frames = 7});
   clock_init();
   fs_init();
 
@@ -150,7 +152,8 @@ static void init(void) {
 static void handle_file_loading(void) {
   fs_dowork();
   const uint32_t load_delay_frames = 60;
-  if (fs_success(FS_SLOT_IMAGE) && ((clock_frame_count_60hz() > load_delay_frames))) {
+  if (fs_success(FS_SLOT_IMAGE) &&
+      ((clock_frame_count_60hz() > load_delay_frames))) {
     bool load_success = false;
     if (fs_ext(FS_SLOT_IMAGE, "k7")) {
       load_success = mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
@@ -160,20 +163,20 @@ static void handle_file_loading(void) {
       load_success = mo5_insert_cartridge(&app.mo5, fs_data(FS_SLOT_IMAGE));
     }
     if (load_success) {
-        if (sargs_exists("input")) {
-            keybuf_put(sargs_value("input"));
-        }
+      if (sargs_exists("input")) {
+        keybuf_put(sargs_value("input"));
+      }
     }
     fs_reset(FS_SLOT_IMAGE);
   }
 }
 
 static void send_keybuf_input(void) {
-    uint8_t key_code;
-    if (0 != (key_code = keybuf_get(app.frame_time_us))) {
-        mo5_key_down(&app.mo5, key_code);
-        mo5_key_up(&app.mo5, key_code);
-    }
+  uint8_t key_code;
+  if (0 != (key_code = keybuf_get(app.frame_time_us))) {
+    mo5_key_down(&app.mo5, key_code);
+    mo5_key_up(&app.mo5, key_code);
+  }
 }
 
 // helper function to adjust aspect ratio
@@ -244,12 +247,29 @@ static void input(const sapp_event *event) {
   switch (event->type) {
   case SAPP_EVENTTYPE_FILES_DROPPED: {
     fs_start_load_dropped_file(FS_SLOT_IMAGE);
-    } break;
+  } break;
   case SAPP_EVENTTYPE_CHAR: {
-    int c = (int)event->char_code;
-    if ((c > 0x20) && (c < 0x7F)) {
-      mo5_key_down(&app.mo5, c);
-      mo5_key_up(&app.mo5, c);
+    if (shift && event->char_code == 'S') {
+      uint8_t screen[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
+      const int stride = SCREEN_WIDTH * 3;
+      mo5_display_info_t info = mo5_display_info(&app.mo5);
+      for (int h = 0; h < SCREEN_HEIGHT; h++) {
+        for (int w = 0; w < SCREEN_WIDTH; w++) {
+            uint8_t col_pal = app.mo5.display.screen[w + h*SCREEN_WIDTH];
+            uint8_t* pal_ptr = (uint8_t*)(((uint32_t*)info.palette.ptr)+col_pal);
+            screen[w * 3 + h * stride+0] = pal_ptr[3];
+            screen[w * 3 + h * stride+1] = pal_ptr[2];
+            screen[w * 3 + h * stride+2] = pal_ptr[1];
+        }
+      }
+      //stbi_write_png("capture.png", SCREEN_WIDTH, SCREEN_HEIGHT, 3, screen, stride);
+        stbi_write_jpg("capture.jpg", SCREEN_WIDTH, SCREEN_HEIGHT, 3, screen, 100);
+    } else {
+      int c = (int)event->char_code;
+      if ((c > 0x20) && (c < 0x7F)) {
+        mo5_key_down(&app.mo5, c);
+        mo5_key_up(&app.mo5, c);
+      }
     }
   } break;
   case SAPP_EVENTTYPE_KEY_DOWN:
@@ -331,8 +351,8 @@ sapp_desc sokol_main(int argc, char *argv[]) {
       .frame_cb = frame,
       .event_cb = input,
       .cleanup_cb = cleanup,
-      .width = 800,
-      .height = 600,
+      .width = 512,
+      .height = 384,
       .window_title = "MO5",
   };
 }

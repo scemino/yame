@@ -1,9 +1,9 @@
 #
-# project: mo5
+# project: yame
 #
 cmake_minimum_required(VERSION 3.21)
 set(CMAKE_C_STANDARD 99)
-project(mo5)
+project(yame)
 
 # include the fips main cmake file
 get_filename_component(FIPS_ROOT_DIR "../fips" ABSOLUTE)
