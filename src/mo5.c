@@ -573,4 +573,5 @@ bool mo5_insert_cartridge(mo5_t* sys, data_t data) {
     sys->cartridge.type = 1; // bank switch system
   sys->cartridge.flags = 4;  // cartridge enabled, write disabled, bank 0;
   prog_init(sys);
+  return true;
 }
