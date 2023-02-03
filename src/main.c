@@ -8,7 +8,9 @@
 #include "sokol_color.h"
 #include "sokol_glue.h"
 #include "sokol_shaders.glsl.h"
+#include "sokol_time.h"
 #define CHIPS_IMPL
+#include "clk.h"
 #include "mo5.h"
 #include "fs.h"
 #include "keybuf.h"
@@ -202,7 +204,7 @@ static void apply_viewport(float canvas_width, float canvas_height) {
 
 static void frame(void) {
   app.frame_time_us = clock_frame_time();
-  mo5_step(&app.mo5);
+  mo5_step(&app.mo5, app.frame_time_us);
 
   // update pixel textures
   sg_update_image(app.gfx.pix_img,

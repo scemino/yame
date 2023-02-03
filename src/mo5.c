@@ -1,9 +1,10 @@
 #include <assert.h>
 #include <string.h>
+#include "clk.h"
 #include "mo5.h"
 #include "mo5rom.h"
 
-#define _MO5_FREQUENCY (4000000)
+#define _MO5_FREQUENCY (1000000)
 
 static uint32_t _mo5_palette[] = {
     0x000000FF, 0xF00000FF, 0x00F000FF, 0xF0F000FF, 0x0000F0FF, 0xF000F0FF,
@@ -287,18 +288,18 @@ static void Switchmemo5bank(mo5_t *mo5, uint16_t address) {
   MO5rombank(mo5);
 }
 
-static void mo5_step_n(mo5_t *mo5, int clock) {
+static void mo5_step_n(mo5_t *mo5, uint32_t clock) {
   if (clock != 1) {
     clock -= mo5->clock_excess;
   }
-  int c = 0;
+  uint32_t c = 0;
   while (c < clock) {
     int result = m6809_run_op(&mo5->cpu);
     if (result < 0) {
       mo5_step_special_opcode(mo5, -result);
       result = 64;
     }
-    c += result;
+    c += (uint32_t)result;
     mo5->clocks += result;
     if (mo5->clocks >= 45) {
       // 1 frame is 20000 cycles
@@ -403,9 +404,9 @@ void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
   _mo5_init_keymap(mo5);
 }
 
-void mo5_step(mo5_t *mo5) {
-  const uint32_t micro_seconds = 0.02 * 10e6;
-  mo5_step_n(mo5, 20000);
+void mo5_step(mo5_t *mo5, uint32_t micro_seconds) {
+  uint32_t num_ticks = clk_us_to_ticks(_MO5_FREQUENCY, micro_seconds);
+  mo5_step_n(mo5, num_ticks);
   kbd_update(&mo5->kbd, micro_seconds);
   screen_draw(mo5);
 }
