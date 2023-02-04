@@ -59,7 +59,7 @@ typedef struct {
     int joy_position; // joysticks position
     int joy_action;   // joystick buttons state
     int xpen, ypen;   // lightpen coordinates
-    int penbutton;    // mouse left button state
+    bool penbutton;   // lightpen click
   } input;
   mc6809e_t cpu;
   kbd_t kbd;

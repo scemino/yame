@@ -247,6 +247,16 @@ static void frame(void) {
 static void input(const sapp_event *event) {
   const bool shift = event->modifiers & SAPP_MODIFIER_SHIFT;
   switch (event->type) {
+  case SAPP_EVENTTYPE_MOUSE_DOWN: {
+      app.mo5.input.penbutton = true;
+  } break;
+  case SAPP_EVENTTYPE_MOUSE_UP: {
+      app.mo5.input.penbutton = false;
+  } break;
+  case SAPP_EVENTTYPE_MOUSE_MOVE: {
+    app.mo5.input.xpen = (SCREEN_WIDTH * ((float)event->mouse_x)/event->framebuffer_width) - 8;
+    app.mo5.input.ypen = (SCREEN_HEIGHT * ((float)event->mouse_y)/event->framebuffer_height) - 8;
+  } break;
   case SAPP_EVENTTYPE_FILES_DROPPED: {
     fs_start_load_dropped_file(FS_SLOT_IMAGE);
   } break;

@@ -181,6 +181,26 @@ static void _mo5_read_sector(mo5_t *mo5) {
   }
 }
 
+static void _mo5_mem_write16(mc6809e_t *cpu, uint16_t address, int16_t value) {
+  cpu->mputc(address, value >> 8);
+  cpu->mputc(address + 1, value);
+}
+
+static void _mo5_read_lightpen_pos(mo5_t *mo5) {
+  if ((mo5->input.xpen < 0) || (mo5->input.xpen >= 320)) {
+    mo5->cpu.cc |= 1;
+    return;
+  }
+  if ((mo5->input.ypen < 0) || (mo5->input.ypen >= 200)) {
+    mo5->cpu.cc |= 1;
+    return;
+  }
+
+  _mo5_mem_write16(&mo5->cpu, mo5->cpu.s + 6, (int16_t)mo5->input.xpen);
+  _mo5_mem_write16(&mo5->cpu, mo5->cpu.s + 8, (int16_t)mo5->input.ypen);
+  mo5->cpu.cc &= 0xFE;
+}
+
 static void _mo5_step_special_opcode(mo5_t *mo5, int io) {
   // thanks to D.Coulom for the next instructions
   // used by his emulator dcmoto
@@ -192,47 +212,54 @@ static void _mo5_step_special_opcode(mo5_t *mo5, int io) {
     _mo5_read_sector(mo5);
     break;
   case 0x15:
+    // write qd-fd sector
     _mo5_diskerror(mo5, 53);
-    break; // ecrit secteur qd-fd
+    break;
   case 0x18:
+    // qd-fd format
     _mo5_diskerror(mo5, 53);
-    break; // formatage qd-fd
+    break;
   case 0x41:
   case 0x11EC:
     _mo5_read_tape_bit(mo5);
     break;
   case 0x42:
-  case 0x11F1: // lecture octet cassette (pour 6809)
-  case 0x11ED: // lecture octet cassette (pour compatibilite 6309)
+  case 0x11F1: // read tape byte (6809)
+  case 0x11ED: // read tape byte (6309 compatibility)
     _mo5_read_tape_byte(mo5);
     break;
-  case 0x11F3: // initialisation controleur disquette
+  case 0x11F3:
+    // init disk controller
     break;
   case 0x45:
+    // write tape byte
     _mo5_diskerror(mo5, 53);
-    break; // ecrit octet cassette
-  case 0x4b:
-    _mo5_diskerror(mo5, 53);
-    break; // lit position crayon
+    break;
+  case 0x4B:
+  case 0x11FF:
+    // read light pen position
+    _mo5_read_lightpen_pos(mo5);
+    break;
   case 0x51:
+    // print a character
     _mo5_diskerror(mo5, 53);
-    break; // imprime un caractere
+    break;
   default:
     // TODO: std::cerr << "Invalid opcode " << std::hex << io << '\n';
-    break; // code op. invalide
+    break;
   }
 }
 
-inline static int _mo5_mem_initLn(
-    mo5_t *mo5) { // 11 microsecondes - 41 microsecondes - 12 microsecondes
+inline static int _mo5_mem_initLn(mo5_t *mo5) {
+  // 11 microsecondes - 41 microsecondes - 12 microsecondes
   if (mo5->display.line_cycle < 23)
     return 0;
   return 0x20;
 }
 
-static int
-_mo5_mem_initN(mo5_t *mo5) { // debut à 12 microsecondes ligne 56, fin
-                             // à 51 microsecondes ligne 255
+static int _mo5_mem_initN(mo5_t *mo5) {
+  // debut à 12 microsecondes ligne 56, fin
+  // à 51 microsecondes ligne 255
   if (mo5->display.line_number < 56)
     return 0;
   if (mo5->display.line_number > 255)
