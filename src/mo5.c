@@ -12,12 +12,12 @@ static uint32_t _mo5_palette[] = {
     0x0063F0FF, 0xF063F0FF, 0x63F0F0FF, 0xF06300FF,
 };
 
-static inline void MO5videoram(mo5_t *mo5) {
+static inline void _mo5_videoram(mo5_t *mo5) {
   mo5->mem.video = mo5->mem.ram + ((mo5->mem.port[0] & 1) << 13);
   mo5->display.border_color = (mo5->mem.port[0] >> 1) & 0x0f;
 }
 
-static void MO5rombank(mo5_t *mo5) {
+static void _mo5_rombank(mo5_t *mo5) {
   if ((mo5->cartridge.flags & 4) == 0) {
     mo5->mem.rom_bank = (uint8_t *)(mo5rom - 0xc000);
     return;
@@ -29,20 +29,20 @@ static void MO5rombank(mo5_t *mo5) {
       mo5->mem.rom_bank += 0x10000;
 }
 
-static void prog_init(mo5_t *mo5) {
+static void _mo5_prog_init(mo5_t *mo5) {
   int16_t Mgetw(uint16_t a);
 
   mo5->input.joy_position = 0xff; // center joysticks
   mo5->input.joy_action = 0xc0;   // buttons released
   mo5->cartridge.flags &= 0xec;
   mo5->mem.sound = 0;
-  MO5videoram(mo5);
-  MO5rombank(mo5);
+  _mo5_videoram(mo5);
+  _mo5_rombank(mo5);
 
   m6809_reset(&mo5->cpu);
 }
 
-static void mo5_reset(mo5_t *mo5) {
+static void _mo5_reset(mo5_t *mo5) {
   mo5->display.line_cycle = 0;
   mo5->display.line_number = 0;
   mo5->mem.sys_rom = mo5rom - 0xc000;
@@ -54,10 +54,10 @@ static void mo5_reset(mo5_t *mo5) {
   for (size_t i = 0; i < sizeof(mo5->mem.cartridge); i++)
     mo5->mem.cartridge[i] = 0;
 
-  prog_init(mo5);
+  _mo5_prog_init(mo5);
 }
 
-static void screen_draw_border(mo5_t *mo5) {
+static void _mo5_screen_draw_border(mo5_t *mo5) {
   const uint8_t bc = mo5->display.border_color;
   uint8_t *pixels = mo5->display.screen;
 
@@ -74,89 +74,53 @@ static void screen_draw_border(mo5_t *mo5) {
   }
 }
 
-static uint8_t video_shape(mo5_t *mo5, int line) {
+static uint8_t _mo5_video_shape(mo5_t *mo5, int line) {
   return mo5->mem.ram[0x2000 | line];
 }
 
-static uint8_t video_color(mo5_t *mo5, int line) { return mo5->mem.ram[line]; }
+static uint8_t _mo5_video_color(mo5_t *mo5, int line) {
+  return mo5->mem.ram[line];
+}
 
-static void screen_draw(mo5_t *mo5) {
-  screen_draw_border(mo5);
+static void _mo5_screen_draw(mo5_t *mo5) {
+  _mo5_screen_draw_border(mo5);
 
-  uint8_t *pixels = mo5->display.screen;
   int i = 0;
-  for (size_t y = 0; y < 200; y++) {
-    size_t offset = (y + 8) * SCREEN_WIDTH + 8;
-    size_t x = 0;
+  uint8_t *pixels = mo5->display.screen;
+  for (int y = 0; y < 200; y++) {
+    int offset = (y + 8) * SCREEN_WIDTH + 8;
 
     for (int xx = 0; xx < 40; xx++) {
-      const uint8_t col = video_color(mo5, i);
+      const uint8_t col = _mo5_video_color(mo5, i);
       uint8_t c1 = col & 0x0F;
       uint8_t c2 = col >> 4;
       assert(c1 >= 0);
       assert(c1 < 16);
 
-      // TODO: oh I need to clean this ugly code
-
-      const uint8_t pt = video_shape(mo5, i);
-      if ((0x80 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x40 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x20 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x10 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x08 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x04 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x02 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
-      if ((0x01 & pt) != 0)
-        pixels[x + offset] = c2;
-      else
-        pixels[x + offset] = c1;
-      x++;
+      const uint8_t pt = _mo5_video_shape(mo5, i);
+      uint8_t shift = 0x80;
+      for (int s = 0; s < 8; s++) {
+        pixels[xx * 8 + s + offset] = (shift & pt) ? c2 : c1;
+        shift >>= 1;
+      }
       i++;
     }
   }
 }
 
-static void diskerror(mo5_t *mo5, int n) {
+static void _mo5_diskerror(mo5_t *mo5, int n) {
   mo5->cpu.mputc(0x204e, n - 1); // erreur 53 = erreur entree/sortie
   mo5->cpu.cc |= 0x01;           // indicateur d'erreur
 }
 
-static void _read_tape_byte(mo5_t* sys) {
+static void _mo5_read_tape_byte(mo5_t *sys) {
   sys->tape.pos++;
   sys->cpu.a = sys->tape.buf[sys->tape.pos];
   sys->cpu.mputc(0x2045, 0);
   sys->tape.bit = 0;
 }
 
-static void _read_tape_bit(mo5_t* sys) {
+static void _mo5_read_tape_bit(mo5_t *sys) {
   // need to read 1 byte ?
   if (sys->tape.bit == 0) {
     sys->tape.bit = 0x80;
@@ -177,36 +141,36 @@ static void _read_tape_bit(mo5_t* sys) {
   sys->tape.bit = sys->tape.bit >> 1;
 }
 
-static void _read_sector(mo5_t *mo5) {
+static void _mo5_read_sector(mo5_t *mo5) {
   // if(controller == 0) Warning(M_DSK_NOTSELECTED);
   // erreur 71=lecteur non prêt
   if (!mo5->disk.size) {
-    diskerror(mo5, 71);
+    _mo5_diskerror(mo5, 71);
     return;
   }
   int u = mo5_mem_read(mo5, 0x2049);
   if (u > 03) {
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     return;
   }
   int p = mo5_mem_read(mo5, 0x204a);
   if (p != 0) {
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     return;
   }
   p = mo5_mem_read(mo5, 0x204b);
   if (p > 79) {
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     return;
   }
   int s = mo5_mem_read(mo5, 0x204c);
   if ((s == 0) || (s > 16)) {
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     return;
   }
   s += 16 * p + 1280 * u;
   if ((s << 8) > mo5->disk.size) {
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     return;
   }
   uint16_t address =
@@ -217,7 +181,7 @@ static void _read_sector(mo5_t *mo5) {
   }
 }
 
-static void mo5_step_special_opcode(mo5_t *mo5, int io) {
+static void _mo5_step_special_opcode(mo5_t *mo5, int io) {
   // thanks to D.Coulom for the next instructions
   // used by his emulator dcmoto
   // TODO:
@@ -225,33 +189,33 @@ static void mo5_step_special_opcode(mo5_t *mo5, int io) {
   case 0x14:
   case 0x11F5:
     // read qd-fd sector
-    _read_sector(mo5);
+    _mo5_read_sector(mo5);
     break;
   case 0x15:
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     break; // ecrit secteur qd-fd
   case 0x18:
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     break; // formatage qd-fd
   case 0x41:
   case 0x11EC:
-    _read_tape_bit(mo5);
+    _mo5_read_tape_bit(mo5);
     break;
   case 0x42:
   case 0x11F1: // lecture octet cassette (pour 6809)
   case 0x11ED: // lecture octet cassette (pour compatibilite 6309)
-    _read_tape_byte(mo5);
+    _mo5_read_tape_byte(mo5);
     break;
   case 0x11F3: // initialisation controleur disquette
     break;
   case 0x45:
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     break; // ecrit octet cassette
   case 0x4b:
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     break; // lit position crayon
   case 0x51:
-    diskerror(mo5, 53);
+    _mo5_diskerror(mo5, 53);
     break; // imprime un caractere
   default:
     // TODO: std::cerr << "Invalid opcode " << std::hex << io << '\n';
@@ -259,15 +223,16 @@ static void mo5_step_special_opcode(mo5_t *mo5, int io) {
   }
 }
 
-inline static int mem_initLn(
+inline static int _mo5_mem_initLn(
     mo5_t *mo5) { // 11 microsecondes - 41 microsecondes - 12 microsecondes
   if (mo5->display.line_cycle < 23)
     return 0;
   return 0x20;
 }
 
-static int mem_initN(mo5_t *mo5) { // debut à 12 microsecondes ligne 56, fin à
-                                   // 51 microsecondes ligne 255
+static int
+_mo5_mem_initN(mo5_t *mo5) { // debut à 12 microsecondes ligne 56, fin
+                             // à 51 microsecondes ligne 255
   if (mo5->display.line_number < 56)
     return 0;
   if (mo5->display.line_number > 255)
@@ -279,16 +244,16 @@ static int mem_initN(mo5_t *mo5) { // debut à 12 microsecondes ligne 56, fin à
   return 0x80;
 }
 
-static void Switchmemo5bank(mo5_t *mo5, uint16_t address) {
+static void _mo5_switch_memo5_bank(mo5_t *mo5, uint16_t address) {
   if (mo5->cartridge.type != 1)
     return;
   if ((address & 0xfffc) != 0xbffc)
     return;
   mo5->cartridge.flags = (mo5->cartridge.flags & 0xfc) | (address & 3);
-  MO5rombank(mo5);
+  _mo5_rombank(mo5);
 }
 
-static void mo5_step_n(mo5_t *mo5, uint32_t clock) {
+static void _mo5_step_n(mo5_t *mo5, uint32_t clock) {
   if (clock != 1) {
     clock -= mo5->clock_excess;
   }
@@ -296,14 +261,15 @@ static void mo5_step_n(mo5_t *mo5, uint32_t clock) {
   while (c < clock) {
     int result = m6809_run_op(&mo5->cpu);
     if (result < 0) {
-      mo5_step_special_opcode(mo5, -result);
+      _mo5_step_special_opcode(mo5, -result);
       result = 64;
     }
     c += (uint32_t)result;
     mo5->clocks += result;
     if (mo5->clocks >= 45) {
       // 1 frame is 20000 cycles
-      // CPU_FREQUENCY / AUDIO_SAMPLE_RATE => 1000000/22050 = 45 cycles at 1MHz
+      // CPU_FREQUENCY / AUDIO_SAMPLE_RATE => 1000000/22050 = 45 cycles at
+      // 1MHz
       // => 1 sample at 22050
       const int n_samples = sizeof(mo5->audio.buffer) / sizeof(float);
       mo5->audio.buffer[mo5->audio.sample] = (float)mo5->mem.sound / 255.f;
@@ -400,15 +366,15 @@ void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
   mo5->cpu.mgetc = desc->mgetc;
   mo5->cpu.mputc = desc->mputc;
   mo5->audio.callback = desc->audio_callback;
-  mo5_reset(mo5);
+  _mo5_reset(mo5);
   _mo5_init_keymap(mo5);
 }
 
 void mo5_step(mo5_t *mo5, uint32_t micro_seconds) {
   uint32_t num_ticks = clk_us_to_ticks(_MO5_FREQUENCY, micro_seconds);
-  mo5_step_n(mo5, num_ticks);
+  _mo5_step_n(mo5, num_ticks);
   kbd_update(&mo5->kbd, micro_seconds);
-  screen_draw(mo5);
+  _mo5_screen_draw(mo5);
 }
 
 uint8_t _mo5_test_key(mo5_t *mo5, uint8_t key) {
@@ -433,7 +399,7 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
     case 0xa7c2:
       return (int8_t)mo5->mem.port[2];
     case 0xa7c3:
-      return (int8_t)(mo5->mem.port[3] | ~mem_initN(mo5));
+      return (int8_t)(mo5->mem.port[3] | ~_mo5_mem_initN(mo5));
     case 0xa7cb:
       return (mo5->cartridge.flags & 0x3f) |
              ((mo5->cartridge.flags & 0x80) >> 1) |
@@ -448,13 +414,13 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
     case 0xa7ce:
       return 4;
     case 0xa7d8:
-      return ~mem_initN(mo5); // disk state byte
+      return ~_mo5_mem_initN(mo5); // disk state byte
     case 0xa7e1:
       return (int8_t)0xff; // printer error number 53 occurs when set to 0
     case 0xa7e6:
-      return mem_initLn(mo5) << 1;
+      return _mo5_mem_initLn(mo5) << 1;
     case 0xa7e7:
-      return mem_initN(mo5);
+      return _mo5_mem_initN(mo5);
     default:
       if (address < 0xa7c0)
         return (int8_t)(cd90640rom[address & 0x7ff]);
@@ -463,7 +429,7 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
       return 0;
     }
   case 0xb:
-    Switchmemo5bank(mo5, address);
+    _mo5_switch_memo5_bank(mo5, address);
     return (int8_t)mo5->mem.rom_bank[address];
   case 0xc:
   case 0xd:
@@ -486,7 +452,7 @@ void mo5_mem_write(mo5_t *mo5, uint16_t a, uint8_t c) {
     switch (a) {
     case 0xa7c0:
       mo5->mem.port[0] = c & 0x5f;
-      MO5videoram(mo5);
+      _mo5_videoram(mo5);
       break;
     case 0xa7c1:
       mo5->mem.port[1] = c & 0x7f;
@@ -500,7 +466,7 @@ void mo5_mem_write(mo5_t *mo5, uint16_t a, uint8_t c) {
       break;
     case 0xa7cb:
       mo5->cartridge.flags = c;
-      MO5rombank(mo5);
+      _mo5_rombank(mo5);
       break;
     case 0xa7cc:
       mo5->mem.port[0x0c] = c;
@@ -541,13 +507,13 @@ mo5_display_info_t mo5_display_info(mo5_t *mo5) {
   return res;
 }
 
-void mo5_key_down(mo5_t* sys, int key_code) {
+void mo5_key_down(mo5_t *sys, int key_code) {
   kbd_key_down(&sys->kbd, key_code);
 }
 
-void mo5_key_up(mo5_t* sys, int key_code) { kbd_key_up(&sys->kbd, key_code); }
+void mo5_key_up(mo5_t *sys, int key_code) { kbd_key_up(&sys->kbd, key_code); }
 
-bool mo5_insert_tape(mo5_t* sys, data_t data) {
+bool mo5_insert_tape(mo5_t *sys, data_t data) {
   sys->tape.bit = 0;
   sys->tape.pos = -1;
   size_t size = (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
@@ -555,15 +521,15 @@ bool mo5_insert_tape(mo5_t* sys, data_t data) {
   return true;
 }
 
-bool mo5_insert_disk(mo5_t* sys, data_t data) {
+bool mo5_insert_disk(mo5_t *sys, data_t data) {
   sys->disk.size =
       (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
   memcpy(sys->disk.buf, data.ptr, sys->disk.size);
-  mo5_reset(sys);
+  _mo5_reset(sys);
   return true;
 }
 
-bool mo5_insert_cartridge(mo5_t* sys, data_t data) {
+bool mo5_insert_cartridge(mo5_t *sys, data_t data) {
   sys->cartridge.size =
       (data.size < MO5_MAX_CARTRIDGE_SIZE) ? data.size : MO5_MAX_CARTRIDGE_SIZE;
   memcpy(sys->mem.cartridge, data.ptr, sys->cartridge.size);
@@ -573,6 +539,6 @@ bool mo5_insert_cartridge(mo5_t* sys, data_t data) {
   if (sys->cartridge.size > 0x4000)
     sys->cartridge.type = 1; // bank switch system
   sys->cartridge.flags = 4;  // cartridge enabled, write disabled, bank 0;
-  prog_init(sys);
+  _mo5_prog_init(sys);
   return true;
 }
