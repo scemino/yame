@@ -291,18 +291,26 @@ static void input(const sapp_event *event) {
     switch (event->key_code) {
     case SAPP_KEYCODE_SPACE:
       c = 0x20;
+      if(event->type == SAPP_EVENTTYPE_KEY_DOWN) {
+        app.mo5.input.joy_action &= ~MO5_JOY0_BTN_MASK; } else {
+            app.mo5.input.joy_action |= MO5_JOY0_BTN_MASK;
+      }
       break;
     case SAPP_KEYCODE_LEFT:
       c = 0x08;
+      app.mo5.input.joys_position.j1_l = event->type != SAPP_EVENTTYPE_KEY_DOWN;
       break;
     case SAPP_KEYCODE_RIGHT:
       c = 0x09;
+      app.mo5.input.joys_position.j1_r = event->type != SAPP_EVENTTYPE_KEY_DOWN;
       break;
     case SAPP_KEYCODE_DOWN:
       c = 0x0A;
+      app.mo5.input.joys_position.j1_d = event->type != SAPP_EVENTTYPE_KEY_DOWN;
       break;
     case SAPP_KEYCODE_UP:
       c = 0x0B;
+      app.mo5.input.joys_position.j1_u = event->type != SAPP_EVENTTYPE_KEY_DOWN;
       break;
     case SAPP_KEYCODE_ENTER:
       c = 0x0D;

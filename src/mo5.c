@@ -5,6 +5,7 @@
 #include "mo5rom.h"
 
 #define _MO5_FREQUENCY (1000000)
+#define _MO5_TAPE_DRIVE_CONNECTED (0x80)
 
 static uint32_t _mo5_palette[] = {
     0x000000FF, 0xF00000FF, 0x00F000FF, 0xF0F000FF, 0x0000F0FF, 0xF000F0FF,
@@ -32,7 +33,7 @@ static void _mo5_rombank(mo5_t *mo5) {
 static void _mo5_prog_init(mo5_t *mo5) {
   int16_t Mgetw(uint16_t a);
 
-  mo5->input.joy_position = 0xff; // center joysticks
+  mo5->input.joys_position.value = 0xff; // center joysticks
   mo5->input.joy_action = 0xc0;   // buttons released
   mo5->cartridge.flags &= 0xec;
   mo5->mem.sound = 0;
@@ -419,7 +420,7 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
   case 0xa:
     switch (address) {
     case 0xa7c0:
-      return mo5->mem.port[0] | 0x80 | (mo5->input.penbutton << 5);
+      return mo5->mem.port[0] | _MO5_TAPE_DRIVE_CONNECTED | (mo5->input.penbutton << 5);
     case 0xa7c1:
       return (int8_t)(mo5->mem.port[1] |
                       _mo5_test_key(mo5, mo5->mem.port[1] & 0xfe));
@@ -432,7 +433,7 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
              ((mo5->cartridge.flags & 0x80) >> 1) |
              ((mo5->cartridge.flags & 0x40) << 1);
     case 0xa7cc:
-      return (int8_t)((mo5->mem.port[0x0e] & 4) ? mo5->input.joy_position
+      return (int8_t)((mo5->mem.port[0x0e] & 4) ? mo5->input.joys_position.value
                                                 : mo5->mem.port[0x0c]);
     case 0xa7cd:
       return (int8_t)((mo5->mem.port[0x0f] & 4)

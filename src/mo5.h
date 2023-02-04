@@ -12,6 +12,8 @@
 #define MO5_MAX_TAPE_SIZE (512*1024)
 // 4x16KB
 #define MO5_MAX_CARTRIDGE_SIZE (0x10000)
+#define MO5_JOY0_BTN_MASK (0x40)
+#define MO5_JOY1_BTN_MASK (0x80)
 
 typedef struct {
   void (*func)(const float *samples, int num_samples, void *user_data);
@@ -56,10 +58,22 @@ typedef struct {
   } audio;
   struct {
     uint8_t key_buffer;
-    int joy_position; // joysticks position
-    int joy_action;   // joystick buttons state
-    int xpen, ypen;   // lightpen coordinates
-    bool penbutton;   // lightpen click
+    union {
+        struct {
+            uint8_t j1_u: 1;
+            uint8_t j1_d: 1;
+            uint8_t j1_l: 1;
+            uint8_t j1_r: 1;
+            uint8_t j2_u: 1;
+            uint8_t j2_d: 1;
+            uint8_t j2_l: 1;
+            uint8_t j2_r: 1;
+        };
+        uint8_t value;
+    } joys_position;      // joysticks position
+    uint8_t joy_action;   // joystick buttons state
+    int xpen, ypen;       // lightpen coordinates
+    bool penbutton;       // lightpen click
   } input;
   mc6809e_t cpu;
   kbd_t kbd;
