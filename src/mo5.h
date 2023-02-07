@@ -15,6 +15,10 @@
 #define MO5_JOY0_BTN_MASK (0x40)
 #define MO5_JOY1_BTN_MASK (0x80)
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
   void (*func)(const float *samples, int num_samples, void *user_data);
   void *user_data;
@@ -92,6 +96,7 @@ typedef struct {
 } mo5_display_info_t;
 
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc);
+void mo5_reset(mo5_t *mo5);
 void mo5_step(mo5_t *mo5, uint32_t micro_seconds);
 int8_t mo5_mem_read(mo5_t *mo5, uint16_t address);
 void mo5_mem_write(mo5_t *mo5, uint16_t address, uint8_t value);
@@ -102,5 +107,9 @@ void mo5_key_up(mo5_t *sys, int key_code);
 bool mo5_insert_tape(mo5_t* sys, data_t data);
 bool mo5_insert_disk(mo5_t* sys, data_t data);
 bool mo5_insert_cartridge(mo5_t* sys, data_t data);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif

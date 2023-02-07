@@ -17,7 +17,14 @@
 #include "clock.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
+#define CHIPS_USE_UI
+#if defined(CHIPS_USE_UI)
+    #include "ui.h"
+    #include "ui/ui_chip.h"
+    #include "ui/ui_kbd.h"
+    #include "ui/ui_mc6809.h"
+    #include "ui/ui_mo5.h"
+#endif
 static struct {
   struct {
     sg_buffer vbuf;
@@ -30,6 +37,7 @@ static struct {
   } gfx;
   uint32_t frame_time_us;
   mo5_t mo5;
+  ui_mo5_t ui;
 } app = {0};
 
 static int8_t mem_read(uint16_t address) {
@@ -45,6 +53,10 @@ static void audio_push(const float *samples, int num_samples, void *user_data) {
   saudio_push(samples, num_samples);
 }
 
+static void ui_draw_cb(void) {
+    ui_mo5_draw(&app.ui);
+}
+
 static void init(void) {
   // init MO5
   mo5_desc_t mo5_desc = {.mgetc = mem_read,
@@ -57,6 +69,12 @@ static void init(void) {
 
   saudio_setup(&(saudio_desc){.sample_rate = 22050});
   sg_setup(&(sg_desc){.context = sapp_sgcontext()});
+
+  ui_init(ui_draw_cb);
+  ui_mo5_init(&app.ui, &(ui_mo5_desc_t){
+    .mo5 = &app.mo5
+  });
+
 
   // a vertex buffer to render a fullscreen triangle
   const float verts[] = {0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 2.0f};
@@ -237,6 +255,7 @@ static void frame(void) {
                      .fs_images[SLOT_rgba_img] = app.gfx.rgba_img});
   apply_viewport(sapp_widthf(), sapp_heightf());
   sg_draw(0, 3, 1);
+  ui_draw();
   sg_end_pass();
   sg_commit();
 
@@ -245,6 +264,10 @@ static void frame(void) {
 }
 
 static void input(const sapp_event *event) {
+  if (ui_input(event)) {
+    // input was handled by UI
+    return;
+  }
   const bool shift = event->modifiers & SAPP_MODIFIER_SHIFT;
   switch (event->type) {
   case SAPP_EVENTTYPE_MOUSE_DOWN: {
