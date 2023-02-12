@@ -12,3 +12,7 @@ fips_begin_app(mo5 windowed)
     sokol_shader(sokol_shaders.glsl ${slang})
     fips_deps(sokol ui)
 fips_end_app()
+
+fips_begin_app(mc6809e_test cmdline)
+    fips_files(mc6809e_test.c mc6809e.h)
+fips_end_app()
