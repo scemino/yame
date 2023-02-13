@@ -1,0 +1,18 @@
+LDA:
+  id: 0x86
+  mcycles:
+    - { type: fetch }
+    - { type: generic, action: "_tstc(c, c->A = _GD())" }
+
+ADDA:
+  id: 0x8B
+  mcycles:
+    - { type: fetch }
+    - { type: generic, action: "_addc(c, &c->A, _GD())" }
+
+EXG:
+  id: 0x1E
+  mcycles:
+    - { type: fetch }
+    - { type: generic, tcycles: 13, action: "_exg(c, _GD())" }
+
