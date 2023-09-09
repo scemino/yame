@@ -5,6 +5,7 @@
 #include "sokol_args.h"
 #include "sokol_gfx.h"
 #include "sokol_app.h"
+#include "sokol_log.h"
 #include "sokol_color.h"
 #include "sokol_glue.h"
 #include "sokol_shaders.glsl.h"
@@ -31,8 +32,10 @@ static struct {
     sg_image pal_img;  // 256x1 palette lookup texture
     sg_image pix_img;  // 336x216 R8 framebuffer texture
     sg_image rgba_img; // 336x216 RGBA8 framebuffer texture
+    sg_sampler off_smp;
     sg_pipeline offscreen_pip;
     sg_pipeline display_pip;
+    sg_sampler disp_smp;
     sg_pass offscreen_pass;
   } gfx;
   uint32_t frame_time_us;
@@ -68,7 +71,10 @@ static void init(void) {
   fs_init();
 
   saudio_setup(&(saudio_desc){.sample_rate = 22050});
-  sg_setup(&(sg_desc){.context = sapp_sgcontext()});
+  sg_setup(&(sg_desc){
+    .context = sapp_sgcontext(),
+    .logger.func = slog_func
+  });
 
   ui_init(ui_draw_cb);
   ui_mo5_init(&app.ui, &(ui_mo5_desc_t){
@@ -87,12 +93,16 @@ static void init(void) {
       .width = SCREEN_WIDTH,
       .height = SCREEN_HEIGHT,
       .pixel_format = SG_PIXELFORMAT_R8,
-      .usage = SG_USAGE_STREAM,
-      .min_filter = SG_FILTER_NEAREST,
-      .mag_filter = SG_FILTER_NEAREST,
-      .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
-      .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
+      .usage = SG_USAGE_STREAM
   });
+
+   // a sampler for sampling the emulators raw pixel data
+    app.gfx.off_smp = sg_make_sampler(&(sg_sampler_desc){
+        .min_filter = SG_FILTER_NEAREST,
+        .mag_filter = SG_FILTER_NEAREST,
+        .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+        .wrap_v = SG_WRAP_CLAMP_TO_EDGE
+    });
 
   // init palette
   static uint32_t palette_buf[256];
@@ -103,10 +113,6 @@ static void init(void) {
       .width = 256,
       .height = 1,
       .pixel_format = SG_PIXELFORMAT_RGBA8,
-      .min_filter = SG_FILTER_NEAREST,
-      .mag_filter = SG_FILTER_NEAREST,
-      .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
-      .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
       .data = {.subimage[0][0] = {.ptr = palette_buf,
                                   .size = sizeof(palette_buf)}}});
 
@@ -118,11 +124,15 @@ static void init(void) {
       .height = SCREEN_HEIGHT,
       .pixel_format = SG_PIXELFORMAT_RGBA8,
       .usage = SG_USAGE_IMMUTABLE,
-      .min_filter = SG_FILTER_LINEAR,
-      .mag_filter = SG_FILTER_LINEAR,
-      .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
-      .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
   });
+
+    // a sampler for sampling the emulators raw pixel data
+     app.gfx.disp_smp = sg_make_sampler(&(sg_sampler_desc){
+         .min_filter = SG_FILTER_LINEAR,
+         .mag_filter = SG_FILTER_LINEAR,
+         .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+         .wrap_v = SG_WRAP_CLAMP_TO_EDGE
+     });
 
   // a pipeline object for the offscreen render pass which
   // performs the color palette lookup
@@ -130,12 +140,11 @@ static void init(void) {
       .shader = sg_make_shader(offscreen_shader_desc(sg_query_backend())),
       .layout = {.attrs[0].format = SG_VERTEXFORMAT_FLOAT2},
       .cull_mode = SG_CULLMODE_NONE,
-      .depth =
-          {
-              .write_enabled = false,
-              .compare = SG_COMPAREFUNC_ALWAYS,
-              .pixel_format = SG_PIXELFORMAT_NONE,
-          },
+      .depth = {
+          .write_enabled = false,
+          .compare = SG_COMPAREFUNC_ALWAYS,
+          .pixel_format = SG_PIXELFORMAT_NONE,
+      },
       .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
   });
 
@@ -145,11 +154,10 @@ static void init(void) {
       .shader = sg_make_shader(display_shader_desc(sg_query_backend())),
       .layout = {.attrs[0].format = SG_VERTEXFORMAT_FLOAT2},
       .cull_mode = SG_CULLMODE_NONE,
-      .depth =
-          {
-              .write_enabled = false,
-              .compare = SG_COMPAREFUNC_ALWAYS,
-          },
+      .depth = {
+          .write_enabled = false,
+          .compare = SG_COMPAREFUNC_ALWAYS,
+      },
   });
 
   // a render pass object for the offscreen pass
@@ -233,26 +241,30 @@ static void frame(void) {
 
   // offscreen render pass to perform color palette lookup
   const sg_pass_action offscreen_pass_action = {
-      .colors[0] = {.action = SG_ACTION_DONTCARE}};
+      .colors[0] = {.load_action = SG_LOADACTION_DONTCARE}};
   sg_begin_pass(app.gfx.offscreen_pass, &offscreen_pass_action);
   sg_apply_pipeline(app.gfx.offscreen_pip);
   sg_apply_bindings(&(sg_bindings){.vertex_buffers[0] = app.gfx.vbuf,
-                                   .fs_images = {
-                                       [SLOT_pix_img] = app.gfx.pix_img,
-                                       [SLOT_pal_img] = app.gfx.pal_img,
-                                   }});
+   .fs.images = {
+       [SLOT_pix_tex] = app.gfx.pix_img,
+       [SLOT_pal_tex] = app.gfx.pal_img,
+   },
+   .fs.samplers[SLOT_smp] = app.gfx.off_smp});
   sg_draw(0, 3, 1);
   sg_end_pass();
 
   // render resulting texture to display framebuffer with upscaling
   const sg_pass_action display_pass_action = {
-      .colors[0] = {.action = SG_ACTION_CLEAR,
-                    .value = {0.0f, 0.0f, 0.0f, 1.0f}}};
+      .colors[0] = {.load_action = SG_LOADACTION_CLEAR,
+                    .clear_value = {0.0f, 0.0f, 0.0f, 1.0f}}};
   sg_begin_default_pass(&display_pass_action, sapp_width(), sapp_height());
   sg_apply_pipeline(app.gfx.display_pip);
   sg_apply_bindings(
-      &(sg_bindings){.vertex_buffers[0] = app.gfx.vbuf,
-                     .fs_images[SLOT_rgba_img] = app.gfx.rgba_img});
+      &(sg_bindings){
+          .vertex_buffers[0] = app.gfx.vbuf,
+          .fs.images[SLOT_rgba_tex] = app.gfx.rgba_img,
+          .fs.samplers[SLOT_smp] = app.gfx.off_smp
+      });
   apply_viewport(sapp_widthf(), sapp_heightf());
   sg_draw(0, 3, 1);
   ui_draw();
