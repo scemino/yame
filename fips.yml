@@ -5,6 +5,8 @@
 policies:
   no_auto_import: true
 imports:
+  dcimgui:
+    git: https://github.com/floooh/dcimgui
   sokol:
     git: https://github.com/scemino/sokol
   sokol-tools-bin:

@@ -7,10 +7,10 @@
 #define _MO5_FREQUENCY (1000000)
 #define _MO5_TAPE_DRIVE_CONNECTED (0x80)
 
-static uint32_t _mo5_palette[] = {
-    0x000000FF, 0xF00000FF, 0x00F000FF, 0xF0F000FF, 0x0000F0FF, 0xF000F0FF,
-    0x00F0F0FF, 0xF0F0F0FF, 0x636363FF, 0xF06363FF, 0x63F063FF, 0xF0F063FF,
-    0x0063F0FF, 0xF063F0FF, 0x63F0F0FF, 0xF06300FF,
+static uint32_t _mo5_palette[256] = {
+    0xFF000000, 0xFF0000F0, 0xFF00F000, 0xFF00F0F0, 0xFFF00000, 0xFFF000F0,
+    0xFFF0F000, 0xFFF0F0F0, 0xFF636363, 0xFF6363F0, 0xFF63F063, 0xFF63F0F0,
+    0xFFF06300, 0xFFF063F0, 0xFFF0F063, 0xFF0063F0,
 };
 
 static inline void _mo5_videoram(mo5_t *mo5) {
@@ -526,13 +526,32 @@ void mo5_mem_write(mo5_t *mo5, uint16_t a, uint8_t c) {
   }
 }
 
-mo5_display_info_t mo5_display_info(mo5_t *mo5) {
-  (void)mo5;
-  const mo5_display_info_t res = {
-      .palette.size = 16 * sizeof(uint32_t),
-      .palette.ptr = _mo5_palette,
-  };
-  return res;
+gfx_display_info_t mo5_display_info(mo5_t *mo5) {
+    assert(mo5);
+    const gfx_display_info_t res = {
+        .frame = {
+            .dim = {
+                .width = SCREEN_WIDTH,
+                .height = SCREEN_HEIGHT,
+            },
+            .buffer = {
+                .ptr = mo5->display.screen,
+                .size = SCREEN_WIDTH*SCREEN_HEIGHT,
+            },
+            .bytes_per_pixel = 1
+        },
+        .screen = {
+            .x = 0,
+            .y = 0,
+            .width = SCREEN_WIDTH,
+            .height = SCREEN_HEIGHT,
+        },
+        .palette = {
+            .ptr = _mo5_palette,
+            .size = 256 * sizeof(uint32_t),
+        }
+    };
+    return res;
 }
 
 void mo5_key_down(mo5_t *sys, int key_code) {
@@ -541,7 +560,7 @@ void mo5_key_down(mo5_t *sys, int key_code) {
 
 void mo5_key_up(mo5_t *sys, int key_code) { kbd_key_up(&sys->kbd, key_code); }
 
-bool mo5_insert_tape(mo5_t *sys, data_t data) {
+bool mo5_insert_tape(mo5_t *sys, gfx_range_t data) {
   sys->tape.bit = 0;
   sys->tape.pos = -1;
   size_t size = (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
@@ -549,7 +568,7 @@ bool mo5_insert_tape(mo5_t *sys, data_t data) {
   return true;
 }
 
-bool mo5_insert_disk(mo5_t *sys, data_t data) {
+bool mo5_insert_disk(mo5_t *sys, gfx_range_t data) {
   sys->disk.size =
       (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
   memcpy(sys->disk.buf, data.ptr, sys->disk.size);
@@ -557,7 +576,7 @@ bool mo5_insert_disk(mo5_t *sys, data_t data) {
   return true;
 }
 
-bool mo5_insert_cartridge(mo5_t *sys, data_t data) {
+bool mo5_insert_cartridge(mo5_t *sys, gfx_range_t data) {
   sys->cartridge.size =
       (data.size < MO5_MAX_CARTRIDGE_SIZE) ? data.size : MO5_MAX_CARTRIDGE_SIZE;
   memcpy(sys->mem.cartridge, data.ptr, sys->cartridge.size);

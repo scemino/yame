@@ -10,12 +10,14 @@ project(mo5)
 get_filename_component(FIPS_ROOT_DIR "../fips" ABSOLUTE)
 include("${FIPS_ROOT_DIR}/cmake/fips.cmake")
 
-fips_setup()
-
 # just suppress this pesky "missing field initializer warning" for now
 if (FIPS_CLANG OR FIPS_GCC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-missing-field-initializers -Wsign-conversion")
 endif()
+
+include_directories(libs/sokol)
+fips_setup()
+fips_import_dcimgui_dcimgui()
 
 fips_ide_group("Libs")
 add_subdirectory(libs)

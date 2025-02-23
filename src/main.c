@@ -5,34 +5,19 @@
 #include "sokol_args.h"
 #include "sokol_gfx.h"
 #include "sokol_app.h"
-#include "sokol_color.h"
 #include "sokol_glue.h"
 #include "sokol_log.h"
-#include "sokol_shaders.glsl.h"
-#include "sokol_time.h"
+#include "clock.h"
+#include "gfx.h"
+#include "fs.h"
 #define CHIPS_IMPL
 #include "clk.h"
 #include "mo5.h"
-#include "fs.h"
 #include "keybuf.h"
-#include "clock.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
 static struct {
-  struct {
-    sg_buffer vbuf;
-    sg_image pal_img;  // 256x1 palette lookup texture
-    sg_image pix_img;  // 336x216 R8 framebuffer texture
-    sg_image rgba_img; // 336x216 RGBA8 framebuffer texture
-    sg_sampler pix_smp;
-    sg_sampler offscreen_smp;
-    sg_pass_action offscreen_pass_action;
-    sg_pass_action display_pass_action;
-    sg_pipeline offscreen_pip;
-    sg_pipeline display_pip;
-    sg_attachments attachments;
-  } gfx;
   uint32_t frame_time_us;
   mo5_t mo5;
 } app = {0};
@@ -52,9 +37,11 @@ static void audio_push(const float *samples, int num_samples, void *user_data) {
 
 static void init(void) {
   // init MO5
-  mo5_desc_t mo5_desc = {.mgetc = mem_read,
-                         .mputc = mem_write,
-                         .audio_callback = {.func = audio_push}};
+  mo5_desc_t mo5_desc = {
+    .mgetc = mem_read,
+    .mputc = mem_write,
+    .audio_callback = {.func = audio_push}
+  };
   mo5_init(&app.mo5, &mo5_desc);
   keybuf_init(&(keybuf_desc_t){.key_delay_frames = 7});
   clock_init();
@@ -70,108 +57,17 @@ static void init(void) {
     .logger.func = slog_func,
   });
 
-  // a vertex buffer to render a fullscreen triangle
-  const float verts[] = {0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 2.0f};
-  app.gfx.offscreen_pass_action = (sg_pass_action) {
-    .colors[0] = { .load_action = SG_LOADACTION_DONTCARE }
-  };
-  app.gfx.vbuf = sg_make_buffer(&(sg_buffer_desc){
-      .data = SG_RANGE(verts),
-  });
-
-  // a dynamic texture for framebuffer
-  app.gfx.pix_img = sg_make_image(&(sg_image_desc){
-    .width = SCREEN_WIDTH,
-    .height = SCREEN_HEIGHT,
-    .pixel_format = SG_PIXELFORMAT_R8,
-    .usage = SG_USAGE_STREAM,
-  });
-
-  // a sampler for sampling the emulators raw pixel data
-  app.gfx.pix_smp = sg_make_sampler(&(sg_sampler_desc){
-    .min_filter = SG_FILTER_NEAREST,
-    .mag_filter = SG_FILTER_NEAREST,
-    .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
-    .wrap_v = SG_WRAP_CLAMP_TO_EDGE
-  });
-
-  // init palette
-  static uint32_t palette_buf[256];
-  mo5_display_info_t info = mo5_display_info(&app.mo5);
-  memcpy(palette_buf, info.palette.ptr, info.palette.size);
-
-  app.gfx.pal_img = sg_make_image(&(sg_image_desc){
-    .width = 256,
-    .height = 1,
-    .pixel_format = SG_PIXELFORMAT_RGBA8,
-    .data = {
-      .subimage[0][0] = {
-        .ptr = palette_buf,
-        .size = sizeof(palette_buf)
-      }
-    }
-  });
-
-  // an RGBA8 texture to hold the 'color palette expanded' image
-  // and source for upscaling with linear filtering
-  app.gfx.rgba_img = sg_make_image(&(sg_image_desc){
-      .render_target = true,
-      .width = SCREEN_WIDTH,
-      .height = SCREEN_HEIGHT,
-      .pixel_format = SG_PIXELFORMAT_RGBA8,
-      .usage = SG_USAGE_IMMUTABLE,
-  });
-
-  // a pipeline object for the offscreen render pass which
-  // performs the color palette lookup
-  app.gfx.offscreen_pip = sg_make_pipeline(&(sg_pipeline_desc){
-      .shader = sg_make_shader(offscreen_shader_desc(sg_query_backend())),
-      .layout = {.attrs[0].format = SG_VERTEXFORMAT_FLOAT2},
-      .cull_mode = SG_CULLMODE_NONE,
-      .depth = {
-        .write_enabled = false,
-        .compare = SG_COMPAREFUNC_ALWAYS,
-        .pixel_format = SG_PIXELFORMAT_NONE,
-      },
-      .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
-  });
-
-  app.gfx.offscreen_smp = sg_make_sampler(&(sg_sampler_desc){
-    .min_filter = SG_FILTER_LINEAR,
-    .mag_filter = SG_FILTER_LINEAR,
-    .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
-    .wrap_v = SG_WRAP_CLAMP_TO_EDGE
-  });
-
-  app.gfx.display_pass_action = (sg_pass_action) {
-      .colors[0] = {
-        .load_action = SG_LOADACTION_CLEAR,
-        .clear_value = {0.0f, 0.0f, 0.0f, 1.0f}
-    }
-  };
-
-  // a pipeline object to upscale the offscreen RGBA8 framebuffer
-  // texture to the display
-  app.gfx.display_pip = sg_make_pipeline(&(sg_pipeline_desc){
-      .shader = sg_make_shader(display_shader_desc(sg_query_backend())),
-      .layout = {
-        .attrs[0].format = SG_VERTEXFORMAT_FLOAT2
-      },
-      .cull_mode = SG_CULLMODE_NONE,
-      .depth = {
-        .write_enabled = false,
-        .compare = SG_COMPAREFUNC_ALWAYS,
-      },
-  });
-
-  app.gfx.attachments = sg_make_attachments(&(sg_attachments_desc){
-    .colors[0].image = app.gfx.rgba_img
+  gfx_init(&(gfx_desc_t){
+    .display_info = mo5_display_info(&app.mo5),
+    #ifdef GAME_USE_UI
+        .draw_extra_cb = ui_draw,
+    #endif
   });
 
   bool delay_input = false;
   if (sargs_exists("file")) {
     delay_input = true;
-    fs_start_load_file(FS_SLOT_IMAGE, sargs_value("file"));
+    fs_load_file_async(FS_CHANNEL_IMAGES, sargs_value("file"));
   }
   if (!delay_input) {
     if (sargs_exists("input")) {
@@ -183,22 +79,22 @@ static void init(void) {
 static void handle_file_loading(void) {
   fs_dowork();
   const uint32_t load_delay_frames = 60;
-  if (fs_success(FS_SLOT_IMAGE) &&
+  if (fs_success(FS_CHANNEL_IMAGES) &&
       ((clock_frame_count_60hz() > load_delay_frames))) {
     bool load_success = false;
-    if (fs_ext(FS_SLOT_IMAGE, "k7")) {
-      load_success = mo5_insert_tape(&app.mo5, fs_data(FS_SLOT_IMAGE));
-    } else if (fs_ext(FS_SLOT_IMAGE, "fd")) {
-      load_success = mo5_insert_disk(&app.mo5, fs_data(FS_SLOT_IMAGE));
-    } else if (fs_ext(FS_SLOT_IMAGE, "rom")) {
-      load_success = mo5_insert_cartridge(&app.mo5, fs_data(FS_SLOT_IMAGE));
+    if (fs_ext(FS_CHANNEL_IMAGES, "k7")) {
+      load_success = mo5_insert_tape(&app.mo5, fs_data(FS_CHANNEL_IMAGES));
+    } else if (fs_ext(FS_CHANNEL_IMAGES, "fd")) {
+      load_success = mo5_insert_disk(&app.mo5, fs_data(FS_CHANNEL_IMAGES));
+    } else if (fs_ext(FS_CHANNEL_IMAGES, "rom")) {
+      load_success = mo5_insert_cartridge(&app.mo5, fs_data(FS_CHANNEL_IMAGES));
     }
     if (load_success) {
       if (sargs_exists("input")) {
         keybuf_put(sargs_value("input"));
       }
     }
-    fs_reset(FS_SLOT_IMAGE);
+    fs_reset(FS_CHANNEL_IMAGES);
   }
 }
 
@@ -210,72 +106,11 @@ static void send_keybuf_input(void) {
   }
 }
 
-// helper function to adjust aspect ratio
-static void apply_viewport(float canvas_width, float canvas_height) {
-  const float canvas_aspect = canvas_width / canvas_height;
-  const float app_width = (float)SCREEN_WIDTH;
-  const float app_height = (float)SCREEN_HEIGHT;
-  const float app_aspect = app_width / app_height;
-  float vp_x, vp_y, vp_w, vp_h;
-  if (app_aspect < canvas_aspect) {
-    vp_y = 0.0f;
-    vp_h = canvas_height;
-    vp_w = canvas_height * app_aspect;
-    vp_x = (canvas_width - vp_w) / 2;
-  } else {
-    vp_x = 0.0f;
-    vp_w = canvas_width;
-    vp_h = canvas_width / app_aspect;
-    vp_y = (canvas_height - vp_h) / 2;
-  }
-  sg_apply_viewport(vp_x, vp_y, vp_w, vp_h, true);
-}
-
 static void frame(void) {
   app.frame_time_us = clock_frame_time();
   mo5_step(&app.mo5, app.frame_time_us);
 
-  // update pixel textures
-  sg_update_image(app.gfx.pix_img, &(sg_image_data){
-    .subimage[0][0] = {
-      .ptr = app.mo5.display.screen,
-      .size = SCREEN_WIDTH * SCREEN_HEIGHT,
-    }
-  });
-
-  // offscreen render pass to perform color palette lookup
-  sg_begin_pass(&(sg_pass){
-        .action = app.gfx.offscreen_pass_action,
-        .attachments = app.gfx.attachments
-    });
-  sg_apply_pipeline(app.gfx.offscreen_pip);
-  sg_apply_bindings(&(sg_bindings){
-    .vertex_buffers[0] = app.gfx.vbuf,
-    .images = {
-      [IMG_pix_img] = app.gfx.pix_img,
-      [IMG_pal_img] = app.gfx.pal_img,
-    },
-    .samplers[SMP_smp] = app.gfx.pix_smp
-  });
-  sg_draw(0, 3, 1);
-  sg_end_pass();
-
-  // render resulting texture to display framebuffer with upscaling
-
-  sg_begin_pass(&(sg_pass){
-    .action = app.gfx.display_pass_action,
-    .swapchain = sglue_swapchain()
-  });
-  sg_apply_pipeline(app.gfx.display_pip);
-  sg_apply_bindings(&(sg_bindings){
-    .vertex_buffers[0] = app.gfx.vbuf,
-    .images[IMG_rgba_img] = app.gfx.rgba_img,
-    .samplers[SMP_smp] = app.gfx.offscreen_smp
-  });
-  apply_viewport(sapp_widthf(), sapp_heightf());
-  sg_draw(0, 3, 1);
-  sg_end_pass();
-  sg_commit();
+  gfx_draw(mo5_display_info(&app.mo5));
 
   handle_file_loading();
   send_keybuf_input();
@@ -295,20 +130,20 @@ static void input(const sapp_event *event) {
     app.mo5.input.ypen = (SCREEN_HEIGHT * ((float)event->mouse_y)/event->framebuffer_height) - 8;
   } break;
   case SAPP_EVENTTYPE_FILES_DROPPED: {
-    fs_start_load_dropped_file(FS_SLOT_IMAGE);
+    fs_load_dropped_file_async(FS_CHANNEL_IMAGES);
   } break;
   case SAPP_EVENTTYPE_CHAR: {
     if (shift && event->char_code == 'S') {
       uint8_t screen[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
       const int stride = SCREEN_WIDTH * 3;
-      mo5_display_info_t info = mo5_display_info(&app.mo5);
+      gfx_display_info_t info = mo5_display_info(&app.mo5);
       for (int h = 0; h < SCREEN_HEIGHT; h++) {
         for (int w = 0; w < SCREEN_WIDTH; w++) {
             uint8_t col_pal = app.mo5.display.screen[w + h*SCREEN_WIDTH];
             uint8_t* pal_ptr = (uint8_t*)(((uint32_t*)info.palette.ptr)+col_pal);
-            screen[w * 3 + h * stride+0] = pal_ptr[3];
-            screen[w * 3 + h * stride+1] = pal_ptr[2];
-            screen[w * 3 + h * stride+2] = pal_ptr[1];
+            screen[w * 3 + h * stride+0] = pal_ptr[0];
+            screen[w * 3 + h * stride+1] = pal_ptr[1];
+            screen[w * 3 + h * stride+2] = pal_ptr[2];
         }
       }
       //stbi_write_png("capture.png", SCREEN_WIDTH, SCREEN_HEIGHT, 3, screen, stride);

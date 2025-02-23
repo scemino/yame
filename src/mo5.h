@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "m6809.h"
 #include "kbd.h"
-#include "data.h"
+#include "gfx.h"
 
 #define SCREEN_WIDTH (336)  // screen width = 320 + 2 borders of 8 pixels
 #define SCREEN_HEIGHT (216) // screen height = 200 + 2 boarders of 8 pixels
@@ -87,20 +87,16 @@ typedef struct {
   chips_audio_callback_t audio_callback;
 } mo5_desc_t;
 
-typedef struct {
-  data_t palette;
-} mo5_display_info_t;
-
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc);
 void mo5_step(mo5_t *mo5, uint32_t micro_seconds);
 int8_t mo5_mem_read(mo5_t *mo5, uint16_t address);
 void mo5_mem_write(mo5_t *mo5, uint16_t address, uint8_t value);
-mo5_display_info_t mo5_display_info(mo5_t *mo5);
+gfx_display_info_t mo5_display_info(mo5_t *mo5);
 void mo5_key_down(mo5_t *sys, int key_code);
 void mo5_key_up(mo5_t *sys, int key_code);
 // insert tape as .k7 file
-bool mo5_insert_tape(mo5_t* sys, data_t data);
-bool mo5_insert_disk(mo5_t* sys, data_t data);
-bool mo5_insert_cartridge(mo5_t* sys, data_t data);
+bool mo5_insert_tape(mo5_t* sys, gfx_range_t data);
+bool mo5_insert_disk(mo5_t* sys, gfx_range_t data);
+bool mo5_insert_cartridge(mo5_t* sys, gfx_range_t data);
 
 #endif
