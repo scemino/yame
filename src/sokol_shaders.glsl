@@ -11,14 +11,15 @@ void main() {
 // pixel shader to perform color palette lookup
 @fs offscreen_fs
 
-uniform sampler2D pix_img;
-uniform sampler2D pal_img;
+layout(binding=0) uniform texture2D pix_img;
+layout(binding=1) uniform texture2D pal_img;
+layout(binding=0) uniform sampler smp;
 in vec2 uv;
 out vec4 frag_color;
 
 void main() {
-    float pix = texture(pix_img, uv).x;
-    frag_color = texture(pal_img, vec2(pix,0)).rgba;
+    float pix = texture(sampler2D(pix_img, smp), uv).x;
+    frag_color = texture(sampler2D(pal_img, smp), vec2(pix,0)).rgba;
 }
 @end
 
@@ -36,7 +37,8 @@ void main() {
 // pixel shader to perform upscale-rendering to display framebuffer
 @fs display_fs
 
-uniform sampler2D rgba_img;
+layout(binding=0) uniform texture2D rgba_img;
+layout(binding=0) uniform sampler smp;
 in vec2 uv;
 out vec4 frag_color;
 
@@ -44,7 +46,7 @@ out vec4 frag_color;
 // RGBA => ABGR
 
 void main() {
-    frag_color = texture(rgba_img, uv).abgr;
+    frag_color = texture(sampler2D(rgba_img, smp), uv).abgr;
 }
 @end
 
