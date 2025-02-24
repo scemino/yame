@@ -36,6 +36,10 @@ static void ui_draw_cb(const ui_draw_info_t* draw_info) {
         .display = draw_info->display,
     });
 }
+
+static void ui_save_settings_cb(ui_settings_t* settings) {
+  ui_emu_save_settings(&app.ui, settings);
+}
 #endif
 
 static int8_t mem_read(uint16_t address) {
@@ -83,11 +87,13 @@ static void init(void) {
   #ifdef EMU_USE_UI
     ui_init(&(ui_desc_t){
       .draw_cb = ui_draw_cb,
+      .save_settings_cb = ui_save_settings_cb,
       .imgui_ini_key = "scemino.yame",
     });
     ui_emu_init(&app.ui, &(ui_emu_desc_t){
         .mo5 = &app.mo5,
     });
+    ui_emu_load_settings(&app.ui, ui_settings());
   #endif
 
   bool delay_input = false;
