@@ -6,7 +6,7 @@
 
     Do this:
     ~~~C
-    #define GAME_UI_IMPL
+    #define EMU_UI_IMPL
     ~~~
     before you include this file in *one* C++ file to create the
     implementation.
@@ -14,7 +14,7 @@
     Optionally provide the following macros with your own implementation
 
     ~~~C
-    GAME_ASSERT(c)
+    EMU_ASSERT(c)
     ~~~
         your own assert macro (default: assert(c))
 
@@ -84,14 +84,14 @@ void ui_display_load_settings(ui_display_t* win, const ui_settings_t* settings);
 #endif
 
 /*-- IMPLEMENTATION (include in C++ source) ----------------------------------*/
-#ifdef GAME_UI_IMPL
+#ifdef EMU_UI_IMPL
 #ifndef __cplusplus
 #error "implementation must be compiled as C++"
 #endif
 #include <string.h> /* memset */
-#ifndef GAME_ASSERT
+#ifndef EMU_ASSERT
     #include <assert.h>
-    #define GAME_ASSERT(c) assert(c)
+    #define EMU_ASSERT(c) assert(c)
 #endif
 
 typedef struct {
@@ -99,8 +99,8 @@ typedef struct {
 } ui_display_quad_t;
 
 void ui_display_init(ui_display_t* win, const ui_display_desc_t* desc) {
-    GAME_ASSERT(win && desc);
-    GAME_ASSERT(desc->title);
+    EMU_ASSERT(win && desc);
+    EMU_ASSERT(desc->title);
     memset(win, 0, sizeof(ui_display_t));
     win->title = desc->title;
     win->init_x = (float) desc->x;
@@ -112,7 +112,7 @@ void ui_display_init(ui_display_t* win, const ui_display_desc_t* desc) {
 }
 
 void ui_display_discard(ui_display_t* win) {
-    GAME_ASSERT(win && win->valid);
+    EMU_ASSERT(win && win->valid);
     win->valid = false;
 }
 
@@ -174,7 +174,7 @@ static ui_display_quad_t ui_display_pos_quad(ImVec2 dim, ImVec2 aspect) {
 }
 
 void ui_display_draw(ui_display_t* win, const ui_display_frame_t* frame) {
-    GAME_ASSERT(win && frame && win->valid && win->title);
+    EMU_ASSERT(win && frame && win->valid && win->title);
     ui_util_handle_window_open_dirty(&win->open, &win->last_open);
     if (!win->open) {
         return;
@@ -194,13 +194,13 @@ void ui_display_draw(ui_display_t* win, const ui_display_frame_t* frame) {
 }
 
 void ui_display_save_settings(ui_display_t* win, ui_settings_t* settings) {
-    GAME_ASSERT(win && settings);
+    EMU_ASSERT(win && settings);
     ui_settings_add(settings, win->title, win->open);
 }
 
 void ui_display_load_settings(ui_display_t* win, const ui_settings_t* settings) {
-    GAME_ASSERT(win && settings);
+    EMU_ASSERT(win && settings);
     win->open = ui_settings_isopen(settings, win->title);
 }
 
-#endif // GAME_UI_IMPL
+#endif // EMU_UI_IMPL

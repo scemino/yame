@@ -26,6 +26,13 @@ endif()
 
 # select the 3D backend for sokol_gfx.h and sokol_app.h
 fips_begin_app(mo5 windowed)
-    fips_files(main.c m6809.c m6809.h mo5rom.h mo5.h mo5.c kbd.h data.h keybuf.h keybuf.c clk.h)
+    fips_files(main.c m6809.c m6809.h mo5rom.h mo5.h mo5.c kbd.h keybuf.h keybuf.c clk.h)
     fips_deps(sokol)
 fips_end_app()
+
+fips_begin_app(mo5-ui windowed)
+    fips_files(main.c m6809.c m6809.h mo5rom.h mo5.h mo5.c kbd.h keybuf.h keybuf.c clk.h mo5-ui-impl.cc)
+    fips_deps(sokol)
+    fips_deps(ui)
+fips_end_app()
+target_compile_definitions(mo5-ui PRIVATE EMU_USE_UI)

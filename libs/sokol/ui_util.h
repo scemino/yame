@@ -6,7 +6,7 @@
 
     Do this:
     ~~~C
-    #define GAME_UI_IMPL
+    #define EMU_UI_IMPL
     ~~~
     before you include this file in *one* C++ file to create the
     implementation.
@@ -14,7 +14,7 @@
     Optionally provide the following macros with your own implementation
 
     ~~~C
-    GAME_ASSERT(c)
+    EMU_ASSERT(c)
     ~~~
         your own assert macro (default: assert(c))
 
@@ -77,7 +77,7 @@ void ui_util_handle_window_open_dirty(const bool* cur_open, bool* last_open);
 #endif
 
 /*-- IMPLEMENTATION (include in C++ source) ----------------------------------*/
-#ifdef GAME_UI_IMPL
+#ifdef EMU_UI_IMPL
 #ifndef __cplusplus
 #error "implementation must be compiled as C++"
 #endif
@@ -87,9 +87,9 @@ void ui_util_handle_window_open_dirty(const bool* cur_open, bool* last_open);
 #endif
 #include <string.h> /* memset */
 #include <stdio.h>  /* sscanf */
-#ifndef GAME_ASSERT
+#ifndef EMU_ASSERT
     #include <assert.h>
-    #define GAME_ASSERT(c) assert(c)
+    #define EMU_ASSERT(c) assert(c)
 #endif
 
 uint16_t ui_util_input_u16(const char* label, uint16_t val) {
@@ -168,7 +168,7 @@ void ui_util_b32(const char* label, uint32_t val) {
 }
 
 uint32_t ui_util_color(int imgui_color) {
-    GAME_ASSERT((imgui_color >= 0) && (imgui_color < ImGuiCol_COUNT));
+    EMU_ASSERT((imgui_color >= 0) && (imgui_color < ImGuiCol_COUNT));
     const ImGuiStyle& style = ImGui::GetStyle();
     ImVec4 c = style.Colors[imgui_color];
     c.w *= style.Alpha;
@@ -195,7 +195,7 @@ void ui_util_options_menu(void) {
 }
 
 void ui_util_handle_window_open_dirty(const bool* cur_open, bool* last_open) {
-    GAME_ASSERT(cur_open && last_open);
+    EMU_ASSERT(cur_open && last_open);
     if (*cur_open != *last_open) {
         *last_open = *cur_open;
         ImGui::MarkIniSettingsDirty();
@@ -205,4 +205,4 @@ void ui_util_handle_window_open_dirty(const bool* cur_open, bool* last_open) {
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-#endif /* GAME_UI_IMPL */
+#endif /* EMU_UI_IMPL */

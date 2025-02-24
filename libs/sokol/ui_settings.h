@@ -6,7 +6,7 @@
 
     Do this:
     ~~~C
-    #define GAME_UI_IMPL
+    #define EMU_UI_IMPL
     ~~~
     before you include this file in *one* C++ file to create the
     implementation.
@@ -80,7 +80,7 @@ bool ui_settings_isopen(const ui_settings_t* state, const char* window_title);
 #endif
 
 //-- IMPLEMENTATION ------------------------------------------------------------
-#ifdef GAME_UI_IMPL
+#ifdef EMU_UI_IMPL
 #include <stdio.h>  // snprintf
 #ifndef CHIPS_ASSERT
     #include <assert.h>
@@ -133,4 +133,4 @@ bool ui_settings_isopen(const ui_settings_t* state, const char* window_title) {
     }
     return false;
 }
-#endif // GAME_UI_IMPL
+#endif // EMU_UI_IMPL

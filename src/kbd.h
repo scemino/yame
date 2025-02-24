@@ -3,12 +3,12 @@
     kbd.h -- keyboard matrix helpers
 
     Do this:
-        #define CHIPS_IMPL
-    before you include this file in *one* C or C++ file to create the 
+        #define EMU_IMPL
+    before you include this file in *one* C or C++ file to create the
     implementation.
 
     Optionally provide the following macros with your own implementation
-    
+
         CHIPS_ASSERT(c)     -- your own assert macro (default: assert(c))
 
     OVERVIEW
@@ -72,7 +72,7 @@
         2. Altered source versions must be plainly marked as such, and must not
         be misrepresented as being the original software.
         3. This notice may not be removed or altered from any source
-        distribution. 
+        distribution.
 */
 #include <stdint.h>
 #include <stdbool.h>
@@ -168,7 +168,7 @@ static inline uint16_t kbd_scan_columns(kbd_t* kbd) {
 #endif
 
 /*-- IMPLEMENTATION ----------------------------------------------------------*/
-#ifdef CHIPS_IMPL
+#ifdef EMU_IMPL
 #include <string.h>
 #ifndef CHIPS_ASSERT
     #include <assert.h>
@@ -407,4 +407,4 @@ uint16_t kbd_test_columns(kbd_t* kbd, uint16_t line_mask) {
     return kbd->cur_scanout_column_mask;
 }
 
-#endif /* CHIPS_IMPL */
+#endif /* EMU_IMPL */

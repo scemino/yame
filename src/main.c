@@ -10,17 +10,33 @@
 #include "clock.h"
 #include "gfx.h"
 #include "fs.h"
-#define CHIPS_IMPL
+#define EMU_IMPL
 #include "clk.h"
 #include "mo5.h"
 #include "keybuf.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include "ui_util.h"
+#if defined(EMU_USE_UI)
+    #include "ui.h"
+    #include "ui_emu.h"
+#endif
 
 static struct {
   uint32_t frame_time_us;
   mo5_t mo5;
+  #ifdef EMU_USE_UI
+    ui_emu_t ui;
+  #endif
 } app = {0};
+
+#ifdef EMU_USE_UI
+static void ui_draw_cb(const ui_draw_info_t* draw_info) {
+    ui_emu_draw(&app.ui, &(ui_emu_frame_t){
+        .display = draw_info->display,
+    });
+}
+#endif
 
 static int8_t mem_read(uint16_t address) {
   return mo5_mem_read(&app.mo5, address);
@@ -59,10 +75,20 @@ static void init(void) {
 
   gfx_init(&(gfx_desc_t){
     .display_info = mo5_display_info(&app.mo5),
-    #ifdef GAME_USE_UI
+    #ifdef EMU_USE_UI
         .draw_extra_cb = ui_draw,
     #endif
   });
+
+  #ifdef EMU_USE_UI
+    ui_init(&(ui_desc_t){
+      .draw_cb = ui_draw_cb,
+      .imgui_ini_key = "scemino.yame",
+    });
+    ui_emu_init(&app.ui, &(ui_emu_desc_t){
+        .mo5 = &app.mo5,
+    });
+  #endif
 
   bool delay_input = false;
   if (sargs_exists("file")) {
@@ -117,6 +143,13 @@ static void frame(void) {
 }
 
 static void input(const sapp_event *event) {
+#ifdef EMU_USE_UI
+  if (ui_input(event)) {
+    // input was handled by UI
+    return;
+  }
+#endif
+
   const bool shift = event->modifiers & SAPP_MODIFIER_SHIFT;
   switch (event->type) {
   case SAPP_EVENTTYPE_MOUSE_DOWN: {
@@ -225,6 +258,10 @@ static void input(const sapp_event *event) {
 }
 
 static void cleanup(void) {
+  #ifdef EMU_USE_UI
+    ui_emu_discard(&app.ui);
+    ui_discard();
+  #endif
   saudio_shutdown();
   sg_shutdown();
 }
