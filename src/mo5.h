@@ -6,6 +6,10 @@
 #include "kbd.h"
 #include "gfx.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SCREEN_WIDTH (336)  // screen width = 320 + 2 borders of 8 pixels
 #define SCREEN_HEIGHT (216) // screen height = 200 + 2 boarders of 8 pixels
 // max size of a cassette tape image
@@ -98,5 +102,9 @@ void mo5_key_up(mo5_t *sys, int key_code);
 bool mo5_insert_tape(mo5_t* sys, gfx_range_t data);
 bool mo5_insert_disk(mo5_t* sys, gfx_range_t data);
 bool mo5_insert_cartridge(mo5_t* sys, gfx_range_t data);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif

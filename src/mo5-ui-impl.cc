@@ -6,8 +6,9 @@
 #include <stddef.h>
 #include "gfx.h"
 #include "sokol_time.h"
-#include "mo5.h"
+#include "gfx.h"
 #define EMU_UI_IMPL
+#include "mo5.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ui_settings.h"

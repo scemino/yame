@@ -15,6 +15,12 @@ typedef struct {
 } ui_emu_audio_t;
 
 typedef struct {
+    int x, y;
+    int w, h;
+    bool open;
+} ui_emu_video_t;
+
+typedef struct {
     mo5_t* mo5;
 } ui_emu_desc_t;
 
@@ -22,6 +28,7 @@ typedef struct {
     mo5_t*             mo5;
     ui_emu_audio_t     audio;
     ui_display_t       display;
+    ui_emu_video_t     video;
 } ui_emu_t;
 
 typedef struct {
@@ -57,6 +64,7 @@ static void _ui_emu_draw_menu(ui_emu_t* ui) {
     EMU_ASSERT(ui && ui->mo5);
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Info")) {
+            ImGui::MenuItem("Video", 0, &ui->video.open);
             ImGui::MenuItem("Audio", 0, &ui->audio.open);
             ImGui::MenuItem("Display", 0, &ui->display.open);
             ImGui::EndMenu();
@@ -79,11 +87,50 @@ static void _ui_emu_draw_audio(ui_emu_t* ui) {
     ImGui::End();
 }
 
+static void _ui_emu_draw_video(ui_emu_t* ui) {
+    if (!ui->video.open) {
+        return;
+    }
+    ImGui::SetNextWindowPos(ImVec2((float)ui->video.x, (float)ui->video.y), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2((float)ui->video.w, (float)ui->video.h), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Video", &ui->video.open)) {
+        ImGui::Text("Palette");
+        gfx_display_info_t display = mo5_display_info(ui->mo5);
+        uint32_t* palette = (uint32_t*)display.palette.ptr;
+        for (int col = 0; col < 16; col++) {
+            ImGui::PushID(col);
+            ImColor c = ImColor(palette[col]);
+            if(ImGui::ColorEdit3("##hw_color", &c.Value.x, ImGuiColorEditFlags_NoInputs)) {
+                palette[col] = (ImU32)c;
+            }
+            ImGui::PopID();
+            if (col != 7) {
+                ImGui::SameLine();
+            }
+        }
+        ImGui::NewLine();
+        ImGui::Text("Border color (%u)", ui->mo5->display.border_color);
+        ImColor c = ImColor(palette[ui->mo5->display.border_color]);
+        ImGui::ColorEdit3("##border_color", &c.Value.x, ImGuiColorEditFlags_NoInputs);
+        ImGui::Separator();
+        ImGui::Text("Line cycle: %u", ui->mo5->display.line_cycle);
+        ImGui::Text("Line number: %u", ui->mo5->display.line_number);
+    }
+    ImGui::End();
+}
+
 void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
     EMU_ASSERT(ui && ui_desc);
     EMU_ASSERT(ui_desc->mo5);
     ui->mo5 = ui_desc->mo5;
     int x = 20, y = 20, dx = 10, dy = 10;
+    {
+        ui->video.x = x;
+        ui->video.y = y;
+        ui->video.w = 200;
+        ui->video.h = 100;
+        x += dx; y += dy;
+    }
     {
         ui->audio.x = x;
         ui->audio.y = y;
@@ -115,12 +162,14 @@ void ui_emu_draw(ui_emu_t* ui, const ui_emu_frame_t* frame) {
     (void)frame;
     EMU_ASSERT(ui && ui->mo5);
     _ui_emu_draw_menu(ui);
+    _ui_emu_draw_video(ui);
     _ui_emu_draw_audio(ui);
     ui_display_draw(&ui->display, &frame->display);
 }
 
 void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
     EMU_ASSERT(ui && settings);
+    ui_settings_add(settings, "Video", ui->video.open);
     ui_settings_add(settings, "Audio", ui->audio.open);
     ui_settings_add(settings, "Display", ui->display.open);
     ui_display_save_settings(&ui->display, settings);
@@ -128,6 +177,7 @@ void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
 
 void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
     EMU_ASSERT(ui && settings);
+    ui->video.open = ui_settings_isopen(settings, "Video");
     ui->audio.open = ui_settings_isopen(settings, "Audio");
     ui->display.open = ui_settings_isopen(settings, "Display");
     ui_display_load_settings(&ui->display, settings);
