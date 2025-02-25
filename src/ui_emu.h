@@ -22,6 +22,7 @@ typedef struct {
 
 typedef struct {
     mo5_t* mo5;
+    ui_snapshot_desc_t snapshot;                // snapshot ui setup params
 } ui_emu_desc_t;
 
 typedef struct {
@@ -29,6 +30,7 @@ typedef struct {
     ui_emu_audio_t     audio;
     ui_display_t       display;
     ui_emu_video_t     video;
+    ui_snapshot_t      snapshot;
 } ui_emu_t;
 
 typedef struct {
@@ -63,6 +65,10 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings);
 static void _ui_emu_draw_menu(ui_emu_t* ui) {
     EMU_ASSERT(ui && ui->mo5);
     if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("System")) {
+            ui_snapshot_menus(&ui->snapshot);
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Info")) {
             ImGui::MenuItem("Video", 0, &ui->video.open);
             ImGui::MenuItem("Audio", 0, &ui->audio.open);
@@ -123,6 +129,7 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
     EMU_ASSERT(ui && ui_desc);
     EMU_ASSERT(ui_desc->mo5);
     ui->mo5 = ui_desc->mo5;
+    ui_snapshot_init(&ui->snapshot, &ui_desc->snapshot);
     int x = 20, y = 20, dx = 10, dy = 10;
     {
         ui->video.x = x;

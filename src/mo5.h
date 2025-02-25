@@ -98,6 +98,8 @@ void mo5_mem_write(mo5_t *mo5, uint16_t address, uint8_t value);
 gfx_display_info_t mo5_display_info(mo5_t *mo5);
 void mo5_key_down(mo5_t *sys, int key_code);
 void mo5_key_up(mo5_t *sys, int key_code);
+bool mo5_load_snapshot(mo5_t* sys, uint32_t version, mo5_t* src);
+uint32_t mo5_save_snapshot(mo5_t* sys, mo5_t* dst);
 // insert tape as .k7 file
 bool mo5_insert_tape(mo5_t* sys, gfx_range_t data);
 bool mo5_insert_disk(mo5_t* sys, gfx_range_t data);

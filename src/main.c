@@ -19,14 +19,21 @@
 #include "ui_util.h"
 #if defined(EMU_USE_UI)
     #include "ui.h"
+    #include "ui_snapshot.h"
     #include "ui_emu.h"
 #endif
+
+typedef struct {
+  uint32_t   version;
+  mo5_t      mo5;
+} mo5_snapshot_t;
 
 static struct {
   uint32_t frame_time_us;
   mo5_t mo5;
   #ifdef EMU_USE_UI
     ui_emu_t ui;
+    mo5_snapshot_t snapshots[UI_SNAPSHOT_MAX_SLOTS];
   #endif
 } app = {0};
 
@@ -39,6 +46,32 @@ static void ui_draw_cb(const ui_draw_info_t* draw_info) {
 
 static void ui_save_settings_cb(ui_settings_t* settings) {
   ui_emu_save_settings(&app.ui, settings);
+}
+
+static void ui_update_snapshot_screenshot(size_t slot) {
+  ui_snapshot_screenshot_t screenshot = {
+      .texture = ui_create_screenshot_texture(mo5_display_info(&app.snapshots[slot].mo5))
+  };
+  ui_snapshot_screenshot_t prev_screenshot = ui_snapshot_set_screenshot(&app.ui.snapshot, slot, screenshot);
+  if (prev_screenshot.texture) {
+      ui_destroy_texture(prev_screenshot.texture);
+  }
+}
+
+static bool ui_load_snapshot(size_t slot) {
+  bool success = false;
+  if ((slot < UI_SNAPSHOT_MAX_SLOTS) && (app.ui.snapshot.slots[slot].valid)) {
+    success = mo5_load_snapshot(&app.mo5, app.snapshots[slot].version, &app.snapshots[slot].mo5);
+  }
+  return success;
+}
+
+static void ui_save_snapshot(size_t slot) {
+  if (slot < UI_SNAPSHOT_MAX_SLOTS) {
+    app.snapshots[slot].version = mo5_save_snapshot(&app.mo5, &app.snapshots[slot].mo5);
+    ui_update_snapshot_screenshot(slot);
+    fs_save_snapshot("mo5", slot, (gfx_range_t){ .ptr = &app.snapshots[slot], sizeof(gfx_range_t) });
+  }
 }
 #endif
 
@@ -92,6 +125,13 @@ static void init(void) {
     });
     ui_emu_init(&app.ui, &(ui_emu_desc_t){
         .mo5 = &app.mo5,
+        .snapshot = {
+          .load_cb = ui_load_snapshot,
+          .save_cb = ui_save_snapshot,
+          .empty_slot_screenshot = {
+              .texture = ui_shared_empty_snapshot_texture(),
+          }
+      },
     });
     ui_emu_load_settings(&app.ui, ui_settings());
   #endif

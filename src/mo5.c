@@ -6,6 +6,8 @@
 
 #define _MO5_FREQUENCY (1000000)
 #define _MO5_TAPE_DRIVE_CONNECTED (0x80)
+// bump when game_t memory layout changes
+#define EMU_SNAPSHOT_VERSION           (0x0001)
 
 static uint32_t _mo5_palette[256] = {
     0xFF000000, 0xFF0000F0, 0xFF00F000, 0xFF00F0F0, 0xFFF00000, 0xFFF000F0,
@@ -389,6 +391,16 @@ static void _mo5_init_keymap(mo5_t *sys) {
   kbd_register_key(&sys->kbd, 0x0E, 4, 6, 0); // insert
 }
 
+void _mo5_audio_callback_snapshot_onsave(chips_audio_callback_t* snapshot) {
+    snapshot->func = 0;
+    snapshot->user_data = 0;
+}
+
+void _mo5_audio_callback_snapshot_onload(chips_audio_callback_t* snapshot, chips_audio_callback_t* sys) {
+    snapshot->func = sys->func;
+    snapshot->user_data = sys->user_data;
+}
+
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
   m6809_init(&mo5->cpu);
   mo5->cpu.mgetc = desc->mgetc;
@@ -588,4 +600,23 @@ bool mo5_insert_cartridge(mo5_t *sys, gfx_range_t data) {
   sys->cartridge.flags = 4;  // cartridge enabled, write disabled, bank 0;
   _mo5_prog_init(sys);
   return true;
+}
+
+bool mo5_load_snapshot(mo5_t* sys, uint32_t version, mo5_t* src) {
+    assert(sys && src);
+    if (version != EMU_SNAPSHOT_VERSION) {
+        return false;
+    }
+    static mo5_t im;
+    im = *src;
+    _mo5_audio_callback_snapshot_onload(&im.audio.callback, &sys->audio.callback);
+    *sys = im;
+    return true;
+}
+
+uint32_t mo5_save_snapshot(mo5_t* sys, mo5_t* dst) {
+    assert(sys && dst);
+    *dst = *sys;
+    _mo5_audio_callback_snapshot_onsave(&dst->audio.callback);
+    return EMU_SNAPSHOT_VERSION;
 }
