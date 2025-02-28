@@ -32,8 +32,6 @@ typedef struct {
     uint8_t *video;
     uint8_t sound;
     uint8_t *rom_bank; // rom bank or cartridge bank
-    const uint8_t *sys_rom;
-    uint8_t *usr_ram;
   } mem;
   struct {
     uint8_t line_cycle;   // line count (0-63)

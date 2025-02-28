@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 #include "clk.h"
 #include "mo5.h"
@@ -8,6 +7,11 @@
 #define _MO5_TAPE_DRIVE_CONNECTED (0x80)
 // bump when game_t memory layout changes
 #define EMU_SNAPSHOT_VERSION           (0x0001)
+
+#ifndef EMU_ASSERT
+    #include <assert.h>
+    #define EMU_ASSERT(c) assert(c)
+#endif
 
 static uint32_t _mo5_palette[256] = {
     0xFF000000, 0xFF0000F0, 0xFF00F000, 0xFF00F0F0, 0xFFF00000, 0xFFF000F0,
@@ -48,8 +52,6 @@ static void _mo5_prog_init(mo5_t *mo5) {
 static void _mo5_reset(mo5_t *mo5) {
   mo5->display.line_cycle = 0;
   mo5->display.line_number = 0;
-  mo5->mem.sys_rom = mo5rom - 0xc000;
-  mo5->mem.usr_ram = mo5->mem.ram + 0x2000;
   for (size_t i = 0; i < sizeof(mo5->mem.ram); i++)
     mo5->mem.ram[i] = -((i & 0x80) >> 7);
   for (size_t i = 0; i < sizeof(mo5->mem.port); i++)
@@ -97,8 +99,8 @@ static void _mo5_screen_draw(mo5_t *mo5) {
       const uint8_t col = _mo5_video_color(mo5, i);
       uint8_t c1 = col & 0x0F;
       uint8_t c2 = col >> 4;
-      assert(c1 >= 0);
-      assert(c1 < 16);
+      EMU_ASSERT(c1 >= 0);
+      EMU_ASSERT(c1 < 16);
 
       const uint8_t pt = _mo5_video_shape(mo5, i);
       uint8_t shift = 0x80;
@@ -476,9 +478,11 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
   case 0xe:
     return (int8_t)mo5->mem.rom_bank[address];
   case 0xf:
-    return (int8_t)mo5->mem.sys_rom[address];
+    EMU_ASSERT(address >= 0xc000);
+    return (int8_t)mo5rom[address - 0xc000];
   default:
-    return (int8_t)mo5->mem.usr_ram[address];
+    EMU_ASSERT(address <= 0xa000);
+    return (int8_t)mo5->mem.ram[address + 0x2000];
   }
 }
 
@@ -534,12 +538,13 @@ void mo5_mem_write(mo5_t *mo5, uint16_t a, uint8_t c) {
   case 0xf:
     break;
   default:
-    mo5->mem.usr_ram[a] = c;
+    EMU_ASSERT(a <= 0xa000);
+    mo5->mem.ram[a + 0x2000] = c;
   }
 }
 
 gfx_display_info_t mo5_display_info(mo5_t *mo5) {
-    assert(mo5);
+    EMU_ASSERT(mo5);
     const gfx_display_info_t res = {
         .frame = {
             .dim = {
@@ -603,7 +608,7 @@ bool mo5_insert_cartridge(mo5_t *sys, gfx_range_t data) {
 }
 
 bool mo5_load_snapshot(mo5_t* sys, uint32_t version, mo5_t* src) {
-    assert(sys && src);
+    EMU_ASSERT(sys && src);
     if (version != EMU_SNAPSHOT_VERSION) {
         return false;
     }
@@ -615,7 +620,7 @@ bool mo5_load_snapshot(mo5_t* sys, uint32_t version, mo5_t* src) {
 }
 
 uint32_t mo5_save_snapshot(mo5_t* sys, mo5_t* dst) {
-    assert(sys && dst);
+    EMU_ASSERT(sys && dst);
     *dst = *sys;
     _mo5_audio_callback_snapshot_onsave(&dst->audio.callback);
     return EMU_SNAPSHOT_VERSION;

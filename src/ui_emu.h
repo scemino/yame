@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
+#include "mo5rom.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +32,7 @@ typedef struct {
     ui_display_t       display;
     ui_emu_video_t     video;
     ui_snapshot_t      snapshot;
+    ui_memedit_t       memedit[4];
 } ui_emu_t;
 
 typedef struct {
@@ -62,6 +64,17 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings);
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
+#define _UI_MO5_MEMLAYER_CPU      (0)
+#define _UI_MO5_MEMLAYER_BASIC    (1)
+#define _UI_MO5_MEMLAYER_MONITOR  (2)
+#define _UI_MO5_MEMLAYER_RAM      (3)
+#define _UI_MO5_MEMLAYER_NUM      (4)
+
+static const char* _ui_mo5_memlayer_names[_UI_MO5_MEMLAYER_NUM] = {
+    "CPU Mapped", "BASIC", "MONITOR", "RAM"
+};
+
+
 static void _ui_emu_draw_menu(ui_emu_t* ui) {
     EMU_ASSERT(ui && ui->mo5);
     if (ImGui::BeginMainMenuBar()) {
@@ -73,6 +86,16 @@ static void _ui_emu_draw_menu(ui_emu_t* ui) {
             ImGui::MenuItem("Video", 0, &ui->video.open);
             ImGui::MenuItem("Audio", 0, &ui->audio.open);
             ImGui::MenuItem("Display", 0, &ui->display.open);
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Debug")) {
+            if (ImGui::BeginMenu("Memory Editor")) {
+                ImGui::MenuItem("Window #1", 0, &ui->memedit[0].open);
+                ImGui::MenuItem("Window #2", 0, &ui->memedit[1].open);
+                ImGui::MenuItem("Window #3", 0, &ui->memedit[2].open);
+                ImGui::MenuItem("Window #4", 0, &ui->memedit[3].open);
+                ImGui::EndMenu();
+            }
             ImGui::EndMenu();
         }
         ui_util_options_menu();
@@ -125,6 +148,71 @@ static void _ui_emu_draw_video(ui_emu_t* ui) {
     ImGui::End();
 }
 
+static const uint8_t* _ui_mo5_rd_memptr(mo5_t* mo5, int layer, uint16_t addr) {
+    EMU_ASSERT((layer >= _UI_MO5_MEMLAYER_BASIC) && (layer < _UI_MO5_MEMLAYER_NUM));
+    if (layer == _UI_MO5_MEMLAYER_BASIC) {
+        if (addr >= 0xc000 && addr < 0xf000) {
+            const uint8_t* rom = mo5rom;
+            return rom + addr - 0xc000;
+        }
+    } else if (layer == _UI_MO5_MEMLAYER_MONITOR) {
+        if (addr >= 0xf000) {
+            const uint8_t* rom = mo5rom;
+            return rom + addr - 0xc000;
+        }
+    } else if (layer == _UI_MO5_MEMLAYER_RAM) {
+        if (addr < 0xc000) {
+            return &mo5->mem.ram[addr];
+        }
+    }
+    /* fallthrough: address isn't mapped to physical RAM */
+    return 0;
+}
+
+static uint8_t* _ui_mo5_memptr(mo5_t* mo5, int layer, uint16_t addr) {
+    EMU_ASSERT((layer >= _UI_MO5_MEMLAYER_BASIC) && (layer < _UI_MO5_MEMLAYER_NUM));
+    if (layer == _UI_MO5_MEMLAYER_RAM) {
+        if (addr < 0xc000) {
+            return &mo5->mem.ram[addr];
+        }
+    }
+    /* fallthrough: address isn't mapped to physical RAM */
+    return 0;
+}
+
+static uint8_t _ui_mo5_mem_read(int layer, uint16_t addr, void* user_data) {
+    CHIPS_ASSERT(user_data);
+    ui_emu_t* ui = (ui_emu_t*) user_data;
+    mo5_t* mo5 = ui->mo5;
+    if (layer == _UI_MO5_MEMLAYER_CPU) {
+        /* TODO: MO5 mapped RAM layer */
+        // return mem_rd(&mo5->mem, addr);
+    } else {
+        const uint8_t* ptr = _ui_mo5_rd_memptr(mo5, layer, addr);
+        if (ptr) {
+            return *ptr;
+        } else {
+            return 0xFF;
+        }
+    }
+    /* fallthrough: address isn't mapped to physical RAM */
+    return 0;
+}
+
+static void _ui_mo5_mem_write(int layer, uint16_t addr, uint8_t data, void* user_data) {
+    CHIPS_ASSERT(user_data);
+    ui_emu_t* ui = (ui_emu_t*) user_data;
+    mo5_t* mo5 = ui->mo5;
+    if (layer == _UI_MO5_MEMLAYER_CPU) {
+        // TODO: mem_wr(&mo5->mem, addr, data);
+    } else {
+        uint8_t* ptr = _ui_mo5_memptr(mo5, layer, addr);
+        if (ptr) {
+            *ptr = data;
+        }
+    }
+}
+
 void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
     EMU_ASSERT(ui && ui_desc);
     EMU_ASSERT(ui_desc->mo5);
@@ -136,8 +224,8 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
         ui->video.y = y;
         ui->video.w = 200;
         ui->video.h = 100;
-        x += dx; y += dy;
     }
+    x += dx; y += dy;
     {
         ui->audio.x = x;
         ui->audio.y = y;
@@ -145,8 +233,8 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
         ui->audio.h = 100;
         ui->audio.buffer = ui->mo5->audio.buffer;
         ui->audio.num_samples = &ui->mo5->audio.sample;
-        x += dx; y += dy;
     }
+    x += dx; y += dy;
     {
         ui_display_desc_t desc = {0};
         desc.title = "Display";
@@ -155,13 +243,31 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
         desc.w = SCREEN_WIDTH + 20;
         desc.h = SCREEN_HEIGHT + 20;
         ui_display_init(&ui->display, &desc);
-        x += dx; y += dy;
+    }
+    x += dx; y += dy;
+    {
+        ui_memedit_desc_t desc = {0};
+        for (int i = 0; i < _UI_MO5_MEMLAYER_NUM; i++) {
+            desc.layers[i] = _ui_mo5_memlayer_names[i];
+        }
+        desc.read_cb = _ui_mo5_mem_read;
+        desc.write_cb = _ui_mo5_mem_write;
+        desc.user_data = ui;
+        static const char* titles[] = { "Memory Editor #1", "Memory Editor #2", "Memory Editor #3", "Memory Editor #4" };
+        for (int i = 0; i < 4; i++) {
+            desc.title = titles[i]; desc.x = x; desc.y = y;
+            ui_memedit_init(&ui->memedit[i], &desc);
+            x += dx; y += dy;
+        }
     }
 }
 
 void ui_emu_discard(ui_emu_t* ui) {
     EMU_ASSERT(ui && ui->mo5);
     ui_display_discard(&ui->display);
+    for (int i = 0; i < 4; i++) {
+        ui_memedit_discard(&ui->memedit[i]);
+    }
     ui->mo5 = 0;
 }
 
@@ -172,6 +278,9 @@ void ui_emu_draw(ui_emu_t* ui, const ui_emu_frame_t* frame) {
     _ui_emu_draw_video(ui);
     _ui_emu_draw_audio(ui);
     ui_display_draw(&ui->display, &frame->display);
+    for (int i = 0; i < 4; i++) {
+        ui_memedit_draw(&ui->memedit[i]);
+    }
 }
 
 void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
@@ -180,6 +289,9 @@ void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
     ui_settings_add(settings, "Audio", ui->audio.open);
     ui_settings_add(settings, "Display", ui->display.open);
     ui_display_save_settings(&ui->display, settings);
+    for (int i = 0; i < 4; i++) {
+        ui_memedit_save_settings(&ui->memedit[i], settings);
+    }
 }
 
 void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
@@ -188,6 +300,9 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
     ui->audio.open = ui_settings_isopen(settings, "Audio");
     ui->display.open = ui_settings_isopen(settings, "Display");
     ui_display_load_settings(&ui->display, settings);
+    for (int i = 0; i < 4; i++) {
+        ui_memedit_load_settings(&ui->memedit[i], settings);
+    }
 }
 
 #ifdef __clang__

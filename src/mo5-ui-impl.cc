@@ -16,4 +16,5 @@
 #include "ui_display.h"
 #include "ui.h"
 #include "ui_snapshot.h"
+#include "ui_memedit.h"
 #include "ui_emu.h"
