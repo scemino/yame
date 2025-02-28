@@ -12,7 +12,7 @@ from mod import log, util, project
 BuildConfig = 'wasm-ninja-release'
 
 systems = [
-    'mo5'
+    'mo5', 'mo5-ui'
 ]
 
 asset_dirs = [ 'mo5' ]
