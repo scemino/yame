@@ -21,6 +21,7 @@
     #include "ui.h"
     #include "ui_snapshot.h"
     #include "ui_memedit.h"
+    #include "ui_kbd.h"
     #include "ui_emu.h"
 #endif
 

@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
     mo5_t*             mo5;
     ui_emu_audio_t     audio;
+    ui_kbd_t           kbd;
     ui_display_t       display;
     ui_emu_video_t     video;
     ui_snapshot_t      snapshot;
@@ -85,6 +86,7 @@ static void _ui_emu_draw_menu(ui_emu_t* ui) {
         if (ImGui::BeginMenu("Info")) {
             ImGui::MenuItem("Video", 0, &ui->video.open);
             ImGui::MenuItem("Audio", 0, &ui->audio.open);
+            ImGui::MenuItem("Keyboard Matrix", 0, &ui->kbd.open);
             ImGui::MenuItem("Display", 0, &ui->display.open);
             ImGui::EndMenu();
         }
@@ -246,6 +248,18 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
     }
     x += dx; y += dy;
     {
+        ui_kbd_desc_t desc = {0};
+        desc.title = "Keyboard Matrix";
+        desc.kbd = &ui->mo5->kbd;
+        desc.layers[0] = "None";
+        desc.layers[1] = "Shift";
+        desc.layers[2] = "Ctrl";
+        desc.x = x;
+        desc.y = y;
+        ui_kbd_init(&ui->kbd, &desc);
+    }
+    x += dx; y += dy;
+    {
         ui_memedit_desc_t desc = {0};
         for (int i = 0; i < _UI_MO5_MEMLAYER_NUM; i++) {
             desc.layers[i] = _ui_mo5_memlayer_names[i];
@@ -265,6 +279,7 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
 void ui_emu_discard(ui_emu_t* ui) {
     EMU_ASSERT(ui && ui->mo5);
     ui_display_discard(&ui->display);
+    ui_kbd_discard(&ui->kbd);
     for (int i = 0; i < 4; i++) {
         ui_memedit_discard(&ui->memedit[i]);
     }
@@ -277,6 +292,7 @@ void ui_emu_draw(ui_emu_t* ui, const ui_emu_frame_t* frame) {
     _ui_emu_draw_menu(ui);
     _ui_emu_draw_video(ui);
     _ui_emu_draw_audio(ui);
+    ui_kbd_draw(&ui->kbd);
     ui_display_draw(&ui->display, &frame->display);
     for (int i = 0; i < 4; i++) {
         ui_memedit_draw(&ui->memedit[i]);
@@ -288,6 +304,7 @@ void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
     ui_settings_add(settings, "Video", ui->video.open);
     ui_settings_add(settings, "Audio", ui->audio.open);
     ui_settings_add(settings, "Display", ui->display.open);
+    ui_kbd_save_settings(&ui->kbd, settings);
     ui_display_save_settings(&ui->display, settings);
     for (int i = 0; i < 4; i++) {
         ui_memedit_save_settings(&ui->memedit[i], settings);
@@ -299,6 +316,7 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
     ui->video.open = ui_settings_isopen(settings, "Video");
     ui->audio.open = ui_settings_isopen(settings, "Audio");
     ui->display.open = ui_settings_isopen(settings, "Display");
+    ui_kbd_load_settings(&ui->kbd, settings);
     ui_display_load_settings(&ui->display, settings);
     for (int i = 0; i < 4; i++) {
         ui_memedit_load_settings(&ui->memedit[i], settings);
