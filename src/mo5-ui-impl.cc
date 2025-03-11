@@ -18,4 +18,7 @@
 #include "ui_snapshot.h"
 #include "ui_memedit.h"
 #include "ui_kbd.h"
+#include "ui_dasm.h"
+#define EMU_UTIL_IMPL
+#include "m6809dasm.h"
 #include "ui_emu.h"
