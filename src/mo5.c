@@ -36,7 +36,8 @@ static void _mo5_rombank(mo5_t *mo5) {
       mo5->mem.rom_bank += 0x10000;
 }
 
-static void _mo5_prog_init(mo5_t *mo5) {
+// soft reset method ("reinit prog" button on original MO5)
+void mo5_prog_init(mo5_t *mo5) {
   int16_t Mgetw(uint16_t a);
 
   mo5->input.joys_position.value = 0xff; // center joysticks
@@ -49,7 +50,7 @@ static void _mo5_prog_init(mo5_t *mo5) {
   m6809_reset(&mo5->cpu);
 }
 
-static void _mo5_reset(mo5_t *mo5) {
+void mo5_reset(mo5_t *mo5) {
   mo5->display.line_cycle = 0;
   mo5->display.line_number = 0;
   for (size_t i = 0; i < sizeof(mo5->mem.ram); i++)
@@ -59,7 +60,7 @@ static void _mo5_reset(mo5_t *mo5) {
   for (size_t i = 0; i < sizeof(mo5->mem.cartridge); i++)
     mo5->mem.cartridge[i] = 0;
 
-  _mo5_prog_init(mo5);
+  mo5_prog_init(mo5);
 }
 
 static void _mo5_screen_draw_border(mo5_t *mo5) {
@@ -408,7 +409,7 @@ void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
   mo5->cpu.mgetc = desc->mgetc;
   mo5->cpu.mputc = desc->mputc;
   mo5->audio.callback = desc->audio_callback;
-  _mo5_reset(mo5);
+  mo5_reset(mo5);
   _mo5_init_keymap(mo5);
 }
 
@@ -589,7 +590,7 @@ bool mo5_insert_disk(mo5_t *sys, gfx_range_t data) {
   sys->disk.size =
       (data.size < MO5_MAX_TAPE_SIZE) ? data.size : MO5_MAX_TAPE_SIZE;
   memcpy(sys->disk.buf, data.ptr, sys->disk.size);
-  _mo5_reset(sys);
+  mo5_reset(sys);
   return true;
 }
 
@@ -603,7 +604,7 @@ bool mo5_insert_cartridge(mo5_t *sys, gfx_range_t data) {
   if (sys->cartridge.size > 0x4000)
     sys->cartridge.type = 1; // bank switch system
   sys->cartridge.flags = 4;  // cartridge enabled, write disabled, bank 0;
-  _mo5_prog_init(sys);
+  mo5_prog_init(sys);
   return true;
 }
 

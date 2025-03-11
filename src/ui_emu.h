@@ -80,6 +80,13 @@ static void _ui_emu_draw_menu(ui_emu_t* ui) {
     EMU_ASSERT(ui && ui->mo5);
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("System")) {
+            if(ImGui::MenuItem("Reset", 0)) {
+                mo5_reset(ui->mo5);
+            }
+            if(ImGui::MenuItem("Soft Reset", 0)) {
+                mo5_prog_init(ui->mo5);
+            }
+            ImGui::Separator();
             ui_snapshot_menus(&ui->snapshot);
             ImGui::EndMenu();
         }

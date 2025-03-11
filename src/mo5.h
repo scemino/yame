@@ -90,6 +90,8 @@ typedef struct {
 } mo5_desc_t;
 
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc);
+void mo5_reset(mo5_t *mo5);
+void mo5_prog_init(mo5_t *mo5);
 void mo5_step(mo5_t *mo5, uint32_t micro_seconds);
 int8_t mo5_mem_read(mo5_t *mo5, uint16_t address);
 void mo5_mem_write(mo5_t *mo5, uint16_t address, uint8_t value);
