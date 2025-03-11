@@ -8,7 +8,7 @@ imports:
   dcimgui:
     git: https://github.com/floooh/dcimgui
   sokol:
-    git: https://github.com/scemino/sokol
+    git: https://github.com/floooh/sokol
   sokol-tools-bin:
     git: https://github.com/floooh/sokol-tools-bin
 
