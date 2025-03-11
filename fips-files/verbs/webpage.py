@@ -22,6 +22,7 @@ items = [
     { 'type':'game', 'title':"3D Fight (tape)",             'system':'mo5', 'url':'mo5.html?file=mo5/3dfight_mo5.k7&input=run%22%22%0A', 'img':'mo5/3dfight_mo5.jpg', 'note':''},
     { 'type':'game', 'title':"Arkanoïd (tape)",             'system':'mo5', 'url':'mo5.html?file=mo5/arkanoid_mo5.k7&input=run%22%22%0A', 'img':'mo5/arkanoid_mo5.jpg', 'note':''},
     { 'type':'game', 'title':"Androïdes (tape)",            'system':'mo5', 'url':'mo5.html?file=mo5/androide-mo5.k7&input=loadm%0A', 'img':'mo5/androide-mo5.jpg', 'note':''},
+    { 'type':'game', 'title':"Avenger (tape)",              'system':'mo5', 'url':'mo5.html?file=mo5/avenger_mo5.k7&input=run%22%22%0A', 'img':'mo5/avenger_mo5.jpg', 'note':''},
     { 'type':'game', 'title':"L'aigle dor (tape)",          'system':'mo5', 'url':'mo5.html?file=mo5/l-aigle-d-or_mo5.k7&input=run%22%22%0A', 'img':'mo5/l-aigle-d-or_mo5.jpg', 'note':''},
     { 'type':'game', 'title':"Classiques vol1 (tape)",      'system':'mo5', 'url':'mo5.html?file=mo5/classiques-vol1_mo5.k7&input=run%22%22%0A', 'img':'mo5/classiques-vol1_mo5.jpg', 'note':''},
     { 'type':'game', 'title':"F15 strike eagle (tape)",     'system':'mo5', 'url':'mo5.html?file=mo5/f15-strike-eagle_mo5.k7&input=run%22%22%0A', 'img':'mo5/f15-strike-eagle_mo5.jpg', 'note':''},
