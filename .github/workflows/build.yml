@@ -30,8 +30,9 @@ jobs:
           run:  python3 fips build osx-make-release
         - name: zip
           working-directory: ../fips-deploy/yame/osx-make-release
-          run:  zip -r mo5.zip mo5.app
-                zip -r mo5-ui.zip mo5-ui.app
+          run:  |
+            zip -r mo5.zip mo5.app
+            zip -r mo5-ui.zip mo5-ui.app
         - name: Upload mo5 macOS package to release
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
