@@ -28,13 +28,17 @@ jobs:
           run:  python3 fips build osx-make-debug
         - name: osx-make-release
           run:  python3 fips build osx-make-release
+        - name: zip
+          working-directory: ../fips-deploy/yame/osx-make-release
+          run:  zip -r mo5.zip mo5.app
+                zip -r mo5-ui.zip mo5-ui.app
         - name: Upload mo5 macOS package to release
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/osx-make-release/mo5
-            asset_name: mo5-mac
+            file: ../fips-deploy/yame/osx-make-release/mo5.zip
+            asset_name: mo5-mac.zip
             tag: ${{ github.ref }}
             overwrite: true
             file_glob: false
@@ -43,8 +47,8 @@ jobs:
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/osx-make-release/mo5-ui
-            asset_name: mo5-ui-mac
+            file: ../fips-deploy/yame/osx-make-release/mo5-ui.zip
+            asset_name: mo5-ui-mac.zip
             tag: ${{ github.ref }}
             overwrite: true
             file_glob: false
