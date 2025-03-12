@@ -11,6 +11,15 @@ jobs:
           run:  python3 fips build win64-vstudio-debug
         - name: win64-vstudio-release
           run:  python3 fips build win64-vstudio-release
+        - name: Upload Windows package to release
+          uses: svenstaro/upload-release-action@v2
+          if: startsWith(github.ref, 'refs/tags/v')
+          with:
+            repo_token: ${{ secrets.GHACTION_PUSH }}
+            file: ../fips-deploy/yame/win64-vstudio-release/*
+            tag: ${{ github.ref }}
+            overwrite: true
+            file_glob: true
     mac:
         runs-on: macos-latest
         steps:
@@ -19,6 +28,15 @@ jobs:
           run:  python3 fips build osx-make-debug
         - name: osx-make-release
           run:  python3 fips build osx-make-release
+        - name: Upload Windows package to release
+          uses: svenstaro/upload-release-action@v2
+          if: startsWith(github.ref, 'refs/tags/v')
+          with:
+            repo_token: ${{ secrets.GHACTION_PUSH }}
+            file: ../fips-deploy/yame/osx-make-release/*
+            tag: ${{ github.ref }}
+            overwrite: true
+            file_glob: true
     linux:
         runs-on: ubuntu-latest
         steps:
@@ -31,6 +49,15 @@ jobs:
           run:  python3 fips build linux-make-debug
         - name: linux-make-release
           run:  python3 fips build linux-make-release
+        - name: Upload Ubuntu package to release
+          uses: svenstaro/upload-release-action@v2
+          if: startsWith(github.ref, 'refs/tags/v')
+          with:
+            repo_token: ${{ secrets.GHACTION_PUSH }}
+            file: ../fips-deploy/yame/linux-make-release/*
+            tag: ${{ github.ref }}
+            overwrite: true
+            file_glob: true
     emscripten:
         runs-on: ubuntu-latest
         steps:
