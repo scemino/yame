@@ -24,6 +24,15 @@ typedef struct {
   void *user_data;
 } chips_audio_callback_t;
 
+typedef void (*mo5_debug_func_t)(void* user_data);
+typedef struct {
+    struct {
+        mo5_debug_func_t func;
+        void* user_data;
+    } callback;
+    bool* stopped;
+} mo5_debug_t;
+
 typedef struct {
   struct {
     uint8_t cartridge[MO5_MAX_CARTRIDGE_SIZE];
@@ -81,12 +90,14 @@ typedef struct {
   kbd_t kbd;
   int clocks;
   uint32_t clock_excess;
+  mo5_debug_t debug;
 } mo5_t;
 
 typedef struct {
   int8_t (*mgetc)(uint16_t);
   void (*mputc)(uint16_t, uint8_t);
   chips_audio_callback_t audio_callback;
+  mo5_debug_t debug;
 } mo5_desc_t;
 
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc);

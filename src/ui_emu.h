@@ -64,10 +64,39 @@ typedef struct {
     uint8_t num_cheats;
 } ui_emu_cheat_list_t;
 
+/* user-defined hotkeys (all strings must be static) */
+typedef struct ui_dbg_key_desc_t {
+    int keycode;    // ImGuiKey_*
+    const char* name;
+} ui_dbg_key_desc_t;
+
+typedef struct ui_dbg_keys_desc_t {
+    ui_dbg_key_desc_t cont;
+    ui_dbg_key_desc_t stop;
+    ui_dbg_key_desc_t step_over;
+} ui_dbg_keys_desc_t;
+
 typedef struct {
     mo5_t* mo5;
-    ui_snapshot_desc_t snapshot;                // snapshot ui setup params
+    ui_snapshot_desc_t snapshot;    // snapshot ui setup params
+    ui_dbg_keys_desc_t dbg_keys;        // user-defined hotkeys
 } ui_emu_desc_t;
+
+/* current step mode */
+enum {
+    UI_DBG_STEPMODE_NONE = 0,
+    UI_DBG_STEPMODE_INTO,
+    UI_DBG_STEPMODE_OVER,
+    UI_DBG_STEPMODE_TICK,
+};
+
+typedef struct ui_dbg_t {
+    int x, y;
+    int w, h;
+    bool open;
+    bool stopped;
+    int step_mode;
+} ui_dbg_t;
 
 typedef struct {
     mo5_t*                  mo5;
@@ -81,6 +110,8 @@ typedef struct {
     ui_snapshot_t           snapshot;
     ui_memedit_t            memedit[4];
     ui_dasm_t               dasm[4];
+    ui_dbg_t                dbg;
+    ui_dbg_keys_desc_t      keys;
 } ui_emu_t;
 
 typedef struct {
@@ -92,6 +123,7 @@ void ui_emu_discard(ui_emu_t* ui);
 void ui_emu_draw(ui_emu_t* ui, const ui_emu_frame_t* frame);
 void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings);
 void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings);
+mo5_debug_t ui_mo5_get_debug(ui_emu_t* ui);
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -148,6 +180,7 @@ static void _ui_emu_draw_menu(ui_emu_t* ui) {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Debug")) {
+            ImGui::MenuItem("CPU", 0, &ui->dbg.open);
             if (ImGui::BeginMenu("Memory Editor")) {
                 ImGui::MenuItem("Window #1", 0, &ui->memedit[0].open);
                 ImGui::MenuItem("Window #2", 0, &ui->memedit[1].open);
@@ -383,6 +416,115 @@ static void _ui_emu_draw_cheats_list(ui_emu_t* ui) {
     ImGui::End();
 }
 
+static inline const char* _ui_dbg_str_or_def(const char* str, const char* def) {
+    if (str) {
+        return str;
+    } else {
+        return def;
+    }
+}
+
+static void _ui_dbg_break(ui_emu_t* ui) {
+    ui->dbg.stopped = true;
+    ui->dbg.step_mode = UI_DBG_STEPMODE_NONE;
+}
+
+static void _ui_dbg_continue(ui_emu_t* ui) {
+    ui->dbg.stopped = false;
+    ui->dbg.step_mode = UI_DBG_STEPMODE_NONE;
+}
+
+static void _ui_dbg_step(ui_emu_t* ui) {
+    ui->dbg.stopped = false;
+    ui->dbg.step_mode = UI_DBG_STEPMODE_OVER;
+}
+
+/* handle keyboard input, the debug window must be focused for hotkeys to work! */
+static void _ui_dbg_handle_input(ui_emu_t* ui) {
+    /* unused hotkeys are defined as 0 and will never be triggered */
+    if (ui->dbg.stopped) {
+        if (0 != ui->keys.cont.keycode) {
+            if (ImGui::IsKeyPressed((ImGuiKey)ui->keys.cont.keycode)) {
+                _ui_dbg_continue(ui);
+            }
+        }
+        if (0 != ui->keys.step_over.keycode) {
+            if (ImGui::IsKeyPressed((ImGuiKey)ui->keys.step_over.keycode)) {
+                _ui_dbg_step(ui);
+            }
+        }
+    } else {
+        if (ImGui::IsKeyPressed((ImGuiKey)ui->keys.stop.keycode)) {
+            _ui_dbg_break(ui);
+        }
+    }
+}
+
+void _ui_dbg_draw_cpu(ui_emu_t* ui) {
+    if (!ui->dbg.open) {
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImVec2((float)ui->dbg.x, (float)ui->dbg.y), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2((float)ui->dbg.w, (float)ui->dbg.h), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("CPU", &ui->dbg.open)) {
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+            ImGui::SetNextFrameWantCaptureKeyboard(true);
+            _ui_dbg_handle_input(ui);
+        }
+
+        mc6809e_t* c = &ui->mo5->cpu;
+        if (ImGui::BeginTable("##reg_columns", 4)) {
+            for (int i = 0; i < 4; i++) {
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 64);
+            }
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            c->x  = ui_util_input_u16("X", c->x); ImGui::TableNextColumn();
+            c->y  = ui_util_input_u16("Y", c->y); ImGui::TableNextColumn();
+            c->u  = ui_util_input_u16("U", c->u); ImGui::TableNextColumn();
+            c->s  = ui_util_input_u16("S", c->s); ImGui::TableNextColumn();
+            c->d  = ui_util_input_u16("D", c->d); ImGui::TableNextColumn();
+            c->w = ui_util_input_u16("W'", c->w); ImGui::TableNextColumn();
+            c->da = ui_util_input_u16("DA'", c->da); ImGui::TableNextColumn();
+            c->pc  = ui_util_input_u16("PC", c->pc); ImGui::TableNextColumn();
+            char cc_str[9] = {
+                (c->cc & MC6809E_EF) ? 'E':'-',
+                (c->cc & MC6809E_FF) ? 'F':'-',
+                (c->cc & MC6809E_HF) ? 'H':'-',
+                (c->cc & MC6809E_IF) ? 'I':'-',
+                (c->cc & MC6809E_NF) ? 'N':'-',
+                (c->cc & MC6809E_ZF) ? 'Z':'-',
+                (c->cc & MC6809E_VF) ? 'V':'-',
+                (c->cc & MC6809E_CF) ? 'C':'-',
+                0,
+            };
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("%s", cc_str);
+            ImGui::EndTable();
+        }
+        ImGui::Separator();
+        char str[32];
+        if (ui->dbg.stopped) {
+            snprintf(str, sizeof(str), "Continue (%s)", _ui_dbg_str_or_def(ui->keys.cont.name, "-"));
+            if (ImGui::Button(str)) {
+                _ui_dbg_continue(ui);
+            }
+            ImGui::SameLine();
+            snprintf(str, sizeof(str), "Step (%s)", _ui_dbg_str_or_def(ui->keys.step_over.name, "-"));
+            if (ImGui::Button(str)) {
+                _ui_dbg_step(ui);
+            }
+        } else {
+            snprintf(str, sizeof(str), "Break (%s)", _ui_dbg_str_or_def(ui->keys.stop.name, "-"));
+            if (ImGui::Button(str)) {
+                _ui_dbg_break(ui);
+            }
+        }
+    }
+    ImGui::End();
+}
+
 static const uint8_t* _ui_mo5_rd_memptr(mo5_t* mo5, int layer, uint16_t addr) {
     EMU_ASSERT((layer >= _UI_MO5_MEMLAYER_BASIC) && (layer < _UI_MO5_MEMLAYER_NUM));
     if (layer == _UI_MO5_MEMLAYER_VIDEO) {
@@ -460,6 +602,7 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
     EMU_ASSERT(ui && ui_desc);
     EMU_ASSERT(ui_desc->mo5);
     ui->mo5 = ui_desc->mo5;
+    ui->keys = ui_desc->dbg_keys;
     ui_snapshot_init(&ui->snapshot, &ui_desc->snapshot);
     int x = 20, y = 20, dx = 10, dy = 10;
     {
@@ -576,6 +719,7 @@ void ui_emu_draw(ui_emu_t* ui, const ui_emu_frame_t* frame) {
     _ui_emu_draw_cheats_add(ui);
     _ui_emu_draw_cheats_list(ui);
     _ui_emu_draw_audio(ui);
+    _ui_dbg_draw_cpu(ui);
     ui_kbd_draw(&ui->kbd);
     ui_display_draw(&ui->display, &frame->display);
     for (int i = 0; i < 4; i++) {
@@ -592,6 +736,7 @@ void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
     ui_settings_add(settings, "Cheats search", ui->cheats_search.open);
     ui_settings_add(settings, "Add cheats", ui->cheats_add.open);
     ui_settings_add(settings, "Cheat list", ui->cheat_list.open);
+    ui_settings_add(settings, "CPU", ui->dbg.open);
     ui_kbd_save_settings(&ui->kbd, settings);
     ui_display_save_settings(&ui->display, settings);
     for (int i = 0; i < 4; i++) {
@@ -610,6 +755,7 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
     ui->cheats_search.open = ui_settings_isopen(settings, "Cheats search");
     ui->cheats_add.open = ui_settings_isopen(settings, "Add cheats");
     ui->cheat_list.open = ui_settings_isopen(settings, "Cheat list");
+    ui->dbg.open = ui_settings_isopen(settings, "CPU");
     ui_kbd_load_settings(&ui->kbd, settings);
     ui_display_load_settings(&ui->display, settings);
     for (int i = 0; i < 4; i++) {
@@ -618,6 +764,21 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
     for (int i = 0; i < 4; i++) {
         ui_dasm_load_settings(&ui->dasm[i], settings);
     }
+}
+
+static void _ui_dbg_tick(ui_emu_t* ui) {
+    if(ui->dbg.step_mode == UI_DBG_STEPMODE_OVER) {
+        ui->dbg.stopped = true;
+    }
+}
+
+mo5_debug_t ui_mo5_get_debug(ui_emu_t* ui) {
+    EMU_ASSERT(ui);
+    mo5_debug_t res = {};
+    res.callback.func = (mo5_debug_func_t)_ui_dbg_tick;
+    res.callback.user_data = ui;
+    res.stopped = &ui->dbg.stopped;
+    return res;
 }
 
 #ifdef __clang__

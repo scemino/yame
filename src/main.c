@@ -96,7 +96,10 @@ static void init(void) {
   mo5_desc_t mo5_desc = {
     .mgetc = mem_read,
     .mputc = mem_write,
-    .audio_callback = {.func = audio_push}
+    .audio_callback = {.func = audio_push},
+    #if defined(EMU_USE_UI)
+      .debug = ui_mo5_get_debug(&app.ui),
+    #endif
   };
   mo5_init(&app.mo5, &mo5_desc);
   keybuf_init(&(keybuf_desc_t){.key_delay_frames = 7});
@@ -133,8 +136,13 @@ static void init(void) {
           .save_cb = ui_save_snapshot,
           .empty_slot_screenshot = {
               .texture = ui_shared_empty_snapshot_texture(),
-          }
-      },
+          },
+        },
+        .dbg_keys = {
+          .cont = { .keycode = simgui_map_keycode(SAPP_KEYCODE_F5), .name = "F5" },
+          .stop = { .keycode = simgui_map_keycode(SAPP_KEYCODE_F5), .name = "F5" },
+          .step_over = { .keycode = simgui_map_keycode(SAPP_KEYCODE_F6), .name = "F6" },
+        }
     });
     ui_emu_load_settings(&app.ui, ui_settings());
   #endif

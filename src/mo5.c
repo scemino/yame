@@ -405,6 +405,7 @@ void _mo5_audio_callback_snapshot_onload(chips_audio_callback_t* snapshot, chips
 }
 
 void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
+  mo5->debug = desc->debug;
   m6809_init(&mo5->cpu);
   mo5->cpu.mgetc = desc->mgetc;
   mo5->cpu.mputc = desc->mputc;
@@ -415,7 +416,16 @@ void mo5_init(mo5_t *mo5, const mo5_desc_t *desc) {
 
 void mo5_step(mo5_t *mo5, uint32_t micro_seconds) {
   uint32_t num_ticks = clk_us_to_ticks(_MO5_FREQUENCY, micro_seconds);
-  _mo5_step_n(mo5, num_ticks);
+  if (0 == mo5->debug.callback.func) {
+    // run without debug hook
+    _mo5_step_n(mo5, num_ticks);
+  } else {
+    // run with debug hook
+    if (!(*mo5->debug.stopped)) {
+        _mo5_step_n(mo5, num_ticks);
+        mo5->debug.callback.func(mo5->debug.callback.user_data);
+    }
+  }
   kbd_update(&mo5->kbd, micro_seconds);
   _mo5_screen_draw(mo5);
 }
