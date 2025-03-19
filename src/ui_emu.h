@@ -21,20 +21,66 @@ typedef struct {
     bool open;
 } ui_emu_video_t;
 
+typedef enum {
+    SEARCH_LOWER,
+    SEARCH_LOWER_OR_EQUALS,
+    SEARCH_GREATER,
+    SEARCH_GREATER_OR_EQUALS,
+    SEARCH_EQUALS,
+    SEARCH_NOT_EQUALS
+} ui_emu_cheats_search_op_t;
+
+typedef struct {
+    int x, y;
+    int w, h;
+    bool open;
+    bool two_bytes;
+    ui_emu_cheats_search_op_t search_op;
+    uint16_t value;
+    uint16_t addresses[32256];
+    uint16_t num_addresses;
+} ui_emu_cheats_search_t;
+
+typedef struct {
+    int x, y;
+    int w, h;
+    bool open;
+    uint16_t address;
+    bool two_bytes;
+    uint16_t value;
+} ui_emu_cheats_add_t;
+
+typedef struct {
+    uint16_t address;
+    uint16_t value;
+    bool two_bytes;
+} ui_emu_cheat_t;
+
+typedef struct {
+    int x, y;
+    int w, h;
+    bool open;
+    ui_emu_cheat_t cheats[10];
+    uint8_t num_cheats;
+} ui_emu_cheat_list_t;
+
 typedef struct {
     mo5_t* mo5;
     ui_snapshot_desc_t snapshot;                // snapshot ui setup params
 } ui_emu_desc_t;
 
 typedef struct {
-    mo5_t*             mo5;
-    ui_emu_audio_t     audio;
-    ui_kbd_t           kbd;
-    ui_display_t       display;
-    ui_emu_video_t     video;
-    ui_snapshot_t      snapshot;
-    ui_memedit_t       memedit[4];
-    ui_dasm_t          dasm[4];
+    mo5_t*                  mo5;
+    ui_emu_audio_t          audio;
+    ui_kbd_t                kbd;
+    ui_display_t            display;
+    ui_emu_video_t          video;
+    ui_emu_cheats_search_t  cheats_search;
+    ui_emu_cheats_add_t     cheats_add;
+    ui_emu_cheat_list_t     cheat_list;
+    ui_snapshot_t           snapshot;
+    ui_memedit_t            memedit[4];
+    ui_dasm_t               dasm[4];
 } ui_emu_t;
 
 typedef struct {
@@ -70,10 +116,11 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings);
 #define _UI_MO5_MEMLAYER_BASIC    (1)
 #define _UI_MO5_MEMLAYER_MONITOR  (2)
 #define _UI_MO5_MEMLAYER_RAM      (3)
-#define _UI_MO5_MEMLAYER_NUM      (4)
+#define _UI_MO5_MEMLAYER_VIDEO    (4)
+#define _UI_MO5_MEMLAYER_NUM      (5)
 
 static const char* _ui_mo5_memlayer_names[_UI_MO5_MEMLAYER_NUM] = {
-    "CPU Mapped", "BASIC", "MONITOR", "RAM"
+    "CPU Mapped", "BASIC", "MONITOR", "RAM", "VIDEO"
 };
 
 static void _ui_emu_draw_menu(ui_emu_t* ui) {
@@ -95,6 +142,9 @@ static void _ui_emu_draw_menu(ui_emu_t* ui) {
             ImGui::MenuItem("Audio", 0, &ui->audio.open);
             ImGui::MenuItem("Keyboard Matrix", 0, &ui->kbd.open);
             ImGui::MenuItem("Display", 0, &ui->display.open);
+            ImGui::MenuItem("Search cheats", 0, &ui->cheats_search.open);
+            ImGui::MenuItem("Add cheat", 0, &ui->cheats_add.open);
+            ImGui::MenuItem("Cheat list", 0, &ui->cheat_list.open);
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Debug")) {
@@ -164,9 +214,182 @@ static void _ui_emu_draw_video(ui_emu_t* ui) {
     ImGui::End();
 }
 
+static bool _ui_emu_cheats_search_addr(ui_emu_t* ui, uint16_t address) {
+    const uint16_t data = ui->cheats_search.two_bytes ? (mo5_mem_read(ui->mo5, address) << 8) | (mo5_mem_read(ui->mo5, address + 1) & 0xff) : (uint8_t)mo5_mem_read(ui->mo5, address);
+    switch(ui->cheats_search.search_op) {
+        case SEARCH_LOWER:
+        return data < ui->cheats_search.value;
+        case SEARCH_LOWER_OR_EQUALS:
+        return (data <= ui->cheats_search.value);
+        case SEARCH_GREATER:
+        return (data > ui->cheats_search.value);
+        case SEARCH_GREATER_OR_EQUALS:
+        return (data >= ui->cheats_search.value);
+        case SEARCH_EQUALS:
+        return (data == ui->cheats_search.value);
+        case SEARCH_NOT_EQUALS:
+        return (data != ui->cheats_search.value);
+    }
+    return false;
+}
+
+static void _ui_emu_cheats_search_go(ui_emu_t* ui) {
+    if(ui->cheats_search.num_addresses == 0) {
+        for(int address = 0x2200; address < 0xa000; address++) {
+            if(_ui_emu_cheats_search_addr(ui, address)) {
+                ui->cheats_search.addresses[ui->cheats_search.num_addresses++] = address;
+            }
+        }
+    } else {
+        int count = 0;
+        for(int i = 0; i < ui->cheats_search.num_addresses; i++) {
+            if(_ui_emu_cheats_search_addr(ui, ui->cheats_search.addresses[i])) {
+                ui->cheats_search.addresses[count++] = ui->cheats_search.addresses[i];
+            }
+        }
+        ui->cheats_search.num_addresses = count;
+    }
+}
+
+static void _ui_emu_draw_cheats_search(ui_emu_t* ui) {
+    if (!ui->cheats_search.open) {
+        return;
+    }
+    ImGui::SetNextWindowPos(ImVec2((float)ui->cheats_search.x, (float)ui->cheats_search.y), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2((float)ui->cheats_search.w, (float)ui->cheats_search.h), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Cheats search", &ui->cheats_search.open)) {
+        ImGui::Text("Size");
+        if(ImGui::RadioButton("1 byte  [0..255]", !ui->cheats_search.two_bytes)) {
+            ui->cheats_search.two_bytes = false;
+        }
+        if(ImGui::RadioButton("2 bytes [0..65535]", ui->cheats_search.two_bytes)) {
+            ui->cheats_search.two_bytes = true;
+        }
+        ImGui::Separator();
+        ImGui::Text("Operator");
+        if(ImGui::RadioButton("< ", ui->cheats_search.search_op == SEARCH_LOWER)) {
+            ui->cheats_search.search_op = SEARCH_LOWER;
+        }
+        ImGui::SameLine();
+        if(ImGui::RadioButton("<=", ui->cheats_search.search_op == SEARCH_LOWER_OR_EQUALS)) {
+            ui->cheats_search.search_op = SEARCH_LOWER_OR_EQUALS;
+        }
+        if(ImGui::RadioButton("> ", ui->cheats_search.search_op == SEARCH_GREATER)) {
+            ui->cheats_search.search_op = SEARCH_GREATER;
+        }
+        ImGui::SameLine();
+        if(ImGui::RadioButton(">=", ui->cheats_search.search_op == SEARCH_GREATER_OR_EQUALS)) {
+            ui->cheats_search.search_op = SEARCH_GREATER_OR_EQUALS;
+        }
+        if(ImGui::RadioButton("==", ui->cheats_search.search_op == SEARCH_EQUALS)) {
+            ui->cheats_search.search_op = SEARCH_EQUALS;
+        }
+        ImGui::SameLine();
+        if(ImGui::RadioButton("!=", ui->cheats_search.search_op == SEARCH_NOT_EQUALS)) {
+            ui->cheats_search.search_op = SEARCH_NOT_EQUALS;
+        }
+        ImGui::Separator();
+        ImGui::Text("Compare to");
+        uint16_t max = ui->cheats_search.two_bytes ? 0xFFFF: 0xFF;
+        ImGui::DragScalar("Specific value", ImGuiDataType_U16, &ui->cheats_search.value, 1.0f, 0, &max);
+        if(ImGui::Button("Search")) {
+            _ui_emu_cheats_search_go(ui);
+        }
+        ImGui::Text("%u results", ui->cheats_search.num_addresses);
+        if (ui->cheats_search.num_addresses < 5) {
+            if (ImGui::BeginListBox("results")) {
+                for(int i = 0; i < ui->cheats_search.num_addresses; i++) {
+                    ImGui::Text("0x%4x", ui->cheats_search.addresses[i]);
+                }
+              ImGui::EndListBox();
+            }
+        }
+        if(ImGui::Button("Clear")) {
+            ui->cheats_search.num_addresses = 0;
+        }
+
+    }
+    ImGui::End();
+}
+
+static void _ui_emu_draw_cheats_add(ui_emu_t* ui) {
+    if (!ui->cheats_add.open) {
+        return;
+    }
+    ImGui::SetNextWindowPos(ImVec2((float)ui->cheats_add.x, (float)ui->cheats_add.y), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2((float)ui->cheats_add.w, (float)ui->cheats_add.h), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Add cheats", &ui->cheats_add.open)) {
+        ImGui::InputScalar("Address", ImGuiDataType_U16, &ui->cheats_add.address, 0, 0, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+        if(ImGui::RadioButton("1 byte  [0..255]", !ui->cheats_add.two_bytes)) {
+            ui->cheats_add.two_bytes = false;
+        }
+        if(ImGui::RadioButton("2 bytes [0..65535]", ui->cheats_add.two_bytes)) {
+            ui->cheats_add.two_bytes = true;
+        }
+        ImGui::Separator();
+        ImGui::InputScalar("Value", ImGuiDataType_U16, &ui->cheats_add.value);
+        if(ImGui::Button("Add") && ui->cheat_list.num_cheats < 10) {
+            ui->cheat_list.cheats[ui->cheat_list.num_cheats].address = ui->cheats_add.address;
+            ui->cheat_list.cheats[ui->cheat_list.num_cheats].value = ui->cheats_add.value;
+            ui->cheat_list.cheats[ui->cheat_list.num_cheats].two_bytes = ui->cheats_add.two_bytes;
+            ui->cheat_list.num_cheats++;
+        }
+    }
+    ImGui::End();
+}
+
+static void _ui_emu_draw_cheats_list(ui_emu_t* ui) {
+    for (int i=0; i<ui->cheat_list.num_cheats; i++) {
+        const ui_emu_cheat_t *cheat = &ui->cheat_list.cheats[i];
+        if(cheat->two_bytes) {
+            mo5_mem_write(ui->mo5, cheat->address, (cheat->value >> 8) & 0xFF);
+            mo5_mem_write(ui->mo5, cheat->address + 1, cheat->value & 0xFF);
+        } else {
+            mo5_mem_write(ui->mo5, cheat->address, cheat->value & 0xFF);
+        }
+    }
+
+    if (!ui->cheat_list.open) {
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImVec2((float)ui->cheat_list.x, (float)ui->cheat_list.y), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2((float)ui->cheat_list.w, (float)ui->cheat_list.h), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Cheat list", &ui->cheat_list.open)) {
+        if (ImGui::BeginTable("Cheats", 3, 0)) {
+            int del_index = -1;
+            for (int i=0; i<ui->cheat_list.num_cheats; i++) {
+                const ui_emu_cheat_t *cheat = &ui->cheat_list.cheats[i];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%04X", cheat->address);
+                ImGui::TableNextColumn();
+                ImGui::Text("%u", cheat->value);
+                ImGui::TableNextColumn();
+                if(ImGui::SmallButton("Del")) {
+                    del_index =  1;
+                }
+            }
+            ImGui::EndTable();
+            if(del_index != -1) {
+                // remove deleted cheat
+                ui->cheat_list.num_cheats--;
+                for (int i=del_index; i<ui->cheat_list.num_cheats; i++) {
+                    ui->cheat_list.cheats[i] = ui->cheat_list.cheats[i+1];
+                }
+            }
+        }
+    }
+    ImGui::End();
+}
+
 static const uint8_t* _ui_mo5_rd_memptr(mo5_t* mo5, int layer, uint16_t addr) {
     EMU_ASSERT((layer >= _UI_MO5_MEMLAYER_BASIC) && (layer < _UI_MO5_MEMLAYER_NUM));
-    if (layer == _UI_MO5_MEMLAYER_BASIC) {
+    if (layer == _UI_MO5_MEMLAYER_VIDEO) {
+        if (addr < 0x2000) {
+            return mo5->mem.video + addr;
+        }
+    } else if (layer == _UI_MO5_MEMLAYER_BASIC) {
         if (addr >= 0xc000 && addr < 0xf000) {
             const uint8_t* rom = mo5rom;
             return rom + addr - 0xc000;
@@ -177,8 +400,8 @@ static const uint8_t* _ui_mo5_rd_memptr(mo5_t* mo5, int layer, uint16_t addr) {
             return rom + addr - 0xc000;
         }
     } else if (layer == _UI_MO5_MEMLAYER_RAM) {
-        if (addr < 0xc000) {
-            return &mo5->mem.ram[addr];
+        if (addr >= 0x2000 && addr < 0xa000) {
+            return &mo5->mem.ram[addr + 0x2000];
         }
     }
     /* fallthrough: address isn't mapped to physical RAM */
@@ -187,9 +410,13 @@ static const uint8_t* _ui_mo5_rd_memptr(mo5_t* mo5, int layer, uint16_t addr) {
 
 static uint8_t* _ui_mo5_memptr(mo5_t* mo5, int layer, uint16_t addr) {
     EMU_ASSERT((layer >= _UI_MO5_MEMLAYER_BASIC) && (layer < _UI_MO5_MEMLAYER_NUM));
-    if (layer == _UI_MO5_MEMLAYER_RAM) {
-        if (addr < 0xc000) {
-            return &mo5->mem.ram[addr];
+    if (layer == _UI_MO5_MEMLAYER_VIDEO) {
+        if (addr < 0x2000) {
+            return &mo5->mem.video[addr];
+        }
+    } else if (layer == _UI_MO5_MEMLAYER_RAM) {
+        if (addr >= 0x2000 && addr < 0xa000) {
+            return &mo5->mem.ram[addr + 0x2000];
         }
     }
     /* fallthrough: address isn't mapped to physical RAM */
@@ -240,6 +467,27 @@ void ui_emu_init(ui_emu_t* ui, const ui_emu_desc_t* ui_desc) {
         ui->video.y = y;
         ui->video.w = 200;
         ui->video.h = 100;
+    }
+    x += dx; y += dy;
+    {
+        ui->cheats_search.x = x;
+        ui->cheats_search.y = y;
+        ui->cheats_search.w = 200;
+        ui->cheats_search.h = 100;
+    }
+    x += dx; y += dy;
+    {
+        ui->cheats_add.x = x;
+        ui->cheats_add.y = y;
+        ui->cheats_add.w = 200;
+        ui->cheats_add.h = 100;
+    }
+    x += dx; y += dy;
+    {
+        ui->cheat_list.x = x;
+        ui->cheat_list.y = y;
+        ui->cheat_list.w = 200;
+        ui->cheat_list.h = 100;
     }
     x += dx; y += dy;
     {
@@ -324,6 +572,9 @@ void ui_emu_draw(ui_emu_t* ui, const ui_emu_frame_t* frame) {
     EMU_ASSERT(ui && ui->mo5);
     _ui_emu_draw_menu(ui);
     _ui_emu_draw_video(ui);
+    _ui_emu_draw_cheats_search(ui);
+    _ui_emu_draw_cheats_add(ui);
+    _ui_emu_draw_cheats_list(ui);
     _ui_emu_draw_audio(ui);
     ui_kbd_draw(&ui->kbd);
     ui_display_draw(&ui->display, &frame->display);
@@ -338,6 +589,9 @@ void ui_emu_save_settings(ui_emu_t* ui, ui_settings_t* settings) {
     ui_settings_add(settings, "Video", ui->video.open);
     ui_settings_add(settings, "Audio", ui->audio.open);
     ui_settings_add(settings, "Display", ui->display.open);
+    ui_settings_add(settings, "Cheats search", ui->cheats_search.open);
+    ui_settings_add(settings, "Add cheats", ui->cheats_add.open);
+    ui_settings_add(settings, "Cheat list", ui->cheat_list.open);
     ui_kbd_save_settings(&ui->kbd, settings);
     ui_display_save_settings(&ui->display, settings);
     for (int i = 0; i < 4; i++) {
@@ -353,6 +607,9 @@ void ui_emu_load_settings(ui_emu_t* ui, const ui_settings_t* settings) {
     ui->video.open = ui_settings_isopen(settings, "Video");
     ui->audio.open = ui_settings_isopen(settings, "Audio");
     ui->display.open = ui_settings_isopen(settings, "Display");
+    ui->cheats_search.open = ui_settings_isopen(settings, "Cheats search");
+    ui->cheats_add.open = ui_settings_isopen(settings, "Add cheats");
+    ui->cheat_list.open = ui_settings_isopen(settings, "Cheat list");
     ui_kbd_load_settings(&ui->kbd, settings);
     ui_display_load_settings(&ui->display, settings);
     for (int i = 0; i < 4; i++) {

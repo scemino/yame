@@ -482,7 +482,7 @@ int8_t mo5_mem_read(mo5_t *mo5, uint16_t address) {
     EMU_ASSERT(address >= 0xc000);
     return (int8_t)mo5rom[address - 0xc000];
   default:
-    EMU_ASSERT(address <= 0xa000);
+    EMU_ASSERT(address < 0xa000);
     return (int8_t)mo5->mem.ram[address + 0x2000];
   }
 }
@@ -539,7 +539,7 @@ void mo5_mem_write(mo5_t *mo5, uint16_t a, uint8_t c) {
   case 0xf:
     break;
   default:
-    EMU_ASSERT(a <= 0xa000);
+    EMU_ASSERT(a < 0xa000);
     mo5->mem.ram[a + 0x2000] = c;
   }
 }
