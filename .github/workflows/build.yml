@@ -20,7 +20,7 @@ jobs:
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
           with:
-            repo_token: ${{ secrets.GITHUB_TOKEN }}
+            repo_token: ${{ secrets.GHACTION_PUSH }}
             file: ./.fibs/dist/win-msvc-release/*
             tag: ${{ github.ref }}
             overwrite: true
@@ -48,7 +48,7 @@ jobs:
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
           with:
-            repo_token: ${{ secrets.GITHUB_TOKEN }}
+            repo_token: ${{ secrets.GHACTION_PUSH }}
             file: ./.fibs/dist/macos-ninja-release/mo5.zip
             asset_name: mo5-mac.zip
             tag: ${{ github.ref }}
@@ -58,7 +58,7 @@ jobs:
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
           with:
-            repo_token: ${{ secrets.GITHUB_TOKEN }}
+            repo_token: ${{ secrets.GHACTION_PUSH }}
             file: ./.fibs/dist/macos-ninja-release/mo5-ui.zip
             asset_name: mo5-ui-mac.zip
             tag: ${{ github.ref }}
@@ -86,7 +86,7 @@ jobs:
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
           with:
-            repo_token: ${{ secrets.GITHUB_TOKEN }}
+            repo_token: ${{ secrets.GHACTION_PUSH }}
             file: ./.fibs/dist/linux-ninja-release/mo5
             asset_name: mo5-linux
             tag: ${{ github.ref }}
@@ -96,7 +96,7 @@ jobs:
           uses: svenstaro/upload-release-action@v2
           if: startsWith(github.ref, 'refs/tags/v')
           with:
-            repo_token: ${{ secrets.GITHUB_TOKEN }}
+            repo_token: ${{ secrets.GHACTION_PUSH }}
             file: ./.fibs/dist/linux-ninja-release/mo5-ui
             asset_name: mo5-ui-linux
             tag: ${{ github.ref }}
