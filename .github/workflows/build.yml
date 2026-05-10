@@ -22,7 +22,7 @@ jobs:
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/win-msvc-release/*
+            file: ./.fibs/dist/win-msvc-release/*
             tag: ${{ github.ref }}
             overwrite: true
             file_glob: true
@@ -42,7 +42,7 @@ jobs:
             ./fibs config macos-ninja-release
             ./fibs build
         - name: zip
-          working-directory: ../fips-deploy/yame/osx-make-release
+          working-directory: ./.fibs/dist/macos-ninja-release
           run:  |
             zip -r mo5.zip mo5.app
             zip -r mo5-ui.zip mo5-ui.app
@@ -51,7 +51,7 @@ jobs:
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/osx-make-release/mo5.zip
+            file: ./.fibs/dist/macos-ninja-release/mo5.zip
             asset_name: mo5-mac.zip
             tag: ${{ github.ref }}
             overwrite: true
@@ -61,7 +61,7 @@ jobs:
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/osx-make-release/mo5-ui.zip
+            file: ./.fibs/dist/macos-ninja-release/mo5-ui.zip
             asset_name: mo5-ui-mac.zip
             tag: ${{ github.ref }}
             overwrite: true
@@ -90,7 +90,7 @@ jobs:
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/linux-make-release/mo5
+            file: ./.fibs/dist/linux-ninja-release/mo5
             asset_name: mo5-linux
             tag: ${{ github.ref }}
             overwrite: true
@@ -100,7 +100,7 @@ jobs:
           if: startsWith(github.ref, 'refs/tags/v')
           with:
             repo_token: ${{ secrets.GHACTION_PUSH }}
-            file: ../fips-deploy/yame/linux-make-release/mo5-ui
+            file: ./.fibs/dist/linux-ninja-release/mo5-ui
             asset_name: mo5-ui-linux
             tag: ${{ github.ref }}
             overwrite: true
