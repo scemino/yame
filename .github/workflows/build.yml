@@ -78,7 +78,6 @@ jobs:
           run: |
             ./fibs config linux-ninja-debug
             ./fibs build
-            ./fibs run mo5
         - name: linux-make-release
           run: |
             ./fibs config linux-ninja-release
