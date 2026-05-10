@@ -111,15 +111,11 @@ static void init(void) {
     .logger.func = slog_func
   });
 
-  sg_setup(&(sg_desc){
-    .environment = sglue_environment(),
-    .logger.func = slog_func,
-  });
-
   gfx_init(&(gfx_desc_t){
     .display_info = mo5_display_info(&app.mo5),
     #ifdef EMU_USE_UI
-        .draw_extra_cb = ui_draw,
+    .init_extra_cb = ui_preinit,
+    .draw_extra_cb = ui_draw,
     #endif
   });
 
